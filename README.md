@@ -124,4 +124,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\backup-data.ps1
 - `WS /ws/terminal`
 
 ## Troubleshooting
-See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [docs/CLOUDFLARE_TUNNEL_SETUP.md](docs/CLOUDFLARE_TUNNEL_SETUP.md).
+See [docs/CLEAN_INSTALL_TEST_RUNBOOK.md](docs/CLEAN_INSTALL_TEST_RUNBOOK.md), [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [docs/CLOUDFLARE_TUNNEL_SETUP.md](docs/CLOUDFLARE_TUNNEL_SETUP.md).
+
