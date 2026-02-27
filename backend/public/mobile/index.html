@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f16" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Remote Terminal Mobile</title>
+  <link rel="manifest" href="/m-manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/mobile/icon-192.svg" />
+  <link rel="stylesheet" href="https://unpkg.com/xterm/css/xterm.css" />
+  <link rel="stylesheet" href="/mobile/mobile.css?v=2026-02-27.01" />
+</head>
+<body>
+  <svg class="hidden-icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" /></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12" /></symbol>
+    <symbol id="i-install" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></symbol>
+    <symbol id="i-connect" viewBox="0 0 24 24"><path d="M8 12h8M12 8l4 4-4 4M4 4h8M4 20h8" /></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 6v6h-6M4 18v-6h6M19 12a7 7 0 0 0-12-5M5 12a7 7 0 0 0 12 5" /></symbol>
+    <symbol id="i-resume" viewBox="0 0 24 24"><path d="M12 5v7l5 3M12 21a9 9 0 1 1 0-18" /></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v10H6z" /></symbol>
+    <symbol id="i-sessions" viewBox="0 0 24 24"><path d="M4 5h16v5H4zM4 14h10v5H4zM16 14h4v5h-4z" /></symbol>
+    <symbol id="i-handoff" viewBox="0 0 24 24"><path d="M8 12h8M12 8l4 4-4 4M5 5h5M14 19h5" /></symbol>
+    <symbol id="i-keys" viewBox="0 0 24 24"><path d="M3 7h18v10H3zM7 11h2M11 11h2M15 11h2" /></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01" /></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M4 7h7l2 2h7v8H4z" /></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 21V9M7 14l5-5 5 5M5 3h14" /></symbol>
+    <symbol id="i-folder-new" viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v8H3zM17 13h-4M15 11v4" /></symbol>
+    <symbol id="i-folder-download" viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v8H3zM12 11v6M9 14l3 3 3-3" /></symbol>
+    <symbol id="i-login" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M4 12h11M4 4h6M4 20h6" /></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 17l-5-5 5-5M20 12H9M14 4h6M14 20h6" /></symbol>
+  </svg>
+
+  <div id="app" class="m-app">
+    <header class="m-topbar">
+      <button id="drawerToggleButton" class="icon-btn" aria-label="Open menu" title="Open menu">
+        <svg class="icon"><use href="#i-menu"></use></svg>
+      </button>
+      <div class="m-title-wrap">
+        <h1>Remote Terminal</h1>
+        <p id="mConnectionLabel">not connected</p>
+      </div>
+      <button id="installAppButton" class="chip secondary hidden icon-chip" aria-label="Install app" title="Install app">
+        <svg class="icon"><use href="#i-install"></use></svg>
+      </button>
+    </header>
+
+    <aside id="mobileDrawer" class="m-drawer hidden" aria-hidden="true">
+      <div class="drawer-header">
+        <h2>Menu</h2>
+        <button id="closeDrawerButton" class="icon-btn" aria-label="Close menu" title="Close menu">
+          <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+      <nav class="drawer-nav">
+        <button data-scene="terminal" class="drawer-item active">Terminal</button>
+        <button data-scene="files" class="drawer-item">Files</button>
+        <button data-scene="access" class="drawer-item">Access</button>
+        <button data-scene="settings" class="drawer-item">Settings</button>
+      </nav>
+    </aside>
+    <div id="drawerBackdrop" class="drawer-backdrop hidden"></div>
+
+    <main class="m-main">
+      <section id="sceneTerminal" class="m-scene active">
+        <div class="scene-head">
+          <div class="scene-head-row">
+            <span id="terminalStatusBadge" class="badge idle">idle</span>
+            <span id="terminalSessionLabel" class="muted">no session</span>
+          </div>
+          <div class="scene-head-row">
+            <select id="terminalFolderSelect"></select>
+            <button id="createTerminalFolderButton" class="chip secondary">New</button>
+          </div>
+          <div class="scene-head-row">
+            <button id="connectTerminalButton" class="chip icon-chip" aria-label="Connect terminal" title="Connect"><svg class="icon"><use href="#i-connect"></use></svg></button>
+            <button id="reconnectTerminalButton" class="chip secondary icon-chip" aria-label="Reconnect terminal" title="Reconnect"><svg class="icon"><use href="#i-refresh"></use></svg></button>
+            <button id="resumeSessionButton" class="chip secondary icon-chip" aria-label="Resume last session" title="Resume"><svg class="icon"><use href="#i-resume"></use></svg></button>
+            <button id="toggleScrollModeButton" class="chip secondary icon-chip" aria-label="View locked" title="View locked"><svg class="icon"><use href="#i-lock"></use></svg></button>
+          </div>
+        </div>
+
+        <div id="terminalViewport" class="terminal-viewport"></div>
+
+        <div class="terminal-actions">
+          <button id="openSessionsButton" class="chip secondary icon-chip" aria-label="Sessions" title="Sessions"><svg class="icon"><use href="#i-sessions"></use></svg></button>
+          <button id="openHandoffButton" class="chip secondary icon-chip" aria-label="Switch to mobile" title="Switch"><svg class="icon"><use href="#i-handoff"></use></svg></button>
+          <button id="toggleKeysButton" class="chip secondary icon-chip" aria-label="Special keys" title="Keys"><svg class="icon"><use href="#i-keys"></use></svg></button>
+          <button id="openMoreButton" class="chip secondary icon-chip" aria-label="More actions" title="More"><svg class="icon"><use href="#i-more"></use></svg></button>
+        </div>
+      </section>
+
+      <section id="sceneFiles" class="m-scene">
+        <div class="scene-head">
+          <div class="scene-head-row">
+            <h2>Files</h2>
+            <button id="refreshFilesButton" class="chip secondary icon-chip" aria-label="Refresh files" title="Refresh"><svg class="icon"><use href="#i-refresh"></use></svg></button>
+          </div>
+          <div class="scene-head-row">
+            <select id="filesFolderSelect"></select>
+            <button id="openFilesFolderButton" class="chip secondary icon-chip" aria-label="Open folder" title="Open folder"><svg class="icon"><use href="#i-open"></use></svg></button>
+          </div>
+          <div id="filesBreadcrumbs" class="breadcrumbs"></div>
+          <p id="filesStatusText" class="muted">path: .</p>
+          <div class="scene-head-row">
+            <button id="downloadFolderButton" class="chip secondary icon-chip" aria-label="Download folder zip" title="Download folder"><svg class="icon"><use href="#i-folder-download"></use></svg></button>
+            <button id="uploadFileButton" class="chip secondary icon-chip" aria-label="Upload files" title="Upload"><svg class="icon"><use href="#i-upload"></use></svg></button>
+            <button id="createFolderButton" class="chip secondary icon-chip" aria-label="Create folder" title="New folder"><svg class="icon"><use href="#i-folder-new"></use></svg></button>
+          </div>
+        </div>
+        <input id="uploadInput" type="file" multiple class="hidden" />
+        <ul id="filesList" class="list"></ul>
+      </section>
+
+      <section id="sceneAccess" class="m-scene">
+        <div class="scene-head">
+          <h2>Access</h2>
+        </div>
+        <div class="card">
+          <label for="passwordInput">Password</label>
+          <input id="passwordInput" type="password" placeholder="Enter admin password" />
+          <div class="inline-actions">
+            <button id="loginButton" class="chip icon-chip" aria-label="Login" title="Login"><svg class="icon"><use href="#i-login"></use></svg></button>
+            <button id="logoutButton" class="chip secondary icon-chip" aria-label="Logout" title="Logout"><svg class="icon"><use href="#i-logout"></use></svg></button>
+          </div>
+          <p id="authStatusText" class="muted">not authenticated</p>
+        </div>
+      </section>
+
+      <section id="sceneSettings" class="m-scene">
+        <div class="scene-head">
+          <h2>Settings</h2>
+        </div>
+        <div class="card">
+          <label for="themeSelect">Theme</label>
+          <select id="themeSelect">
+            <option value="auto">Auto</option>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+        <div class="card">
+          <label for="fontSizeSelect">Terminal Text Size</label>
+          <select id="fontSizeSelect">
+            <option value="auto">Auto</option>
+            <option value="11">Small</option>
+            <option value="13">Medium</option>
+            <option value="15">Large</option>
+          </select>
+        </div>
+        <div class="card">
+          <label><input id="hapticsToggle" type="checkbox" /> Haptics</label>
+          <button id="resetPreferencesButton" class="chip secondary">Reset Preferences</button>
+        </div>
+      </section>
+    </main>
+
+    <section id="sessionsSheet" class="sheet hidden" aria-hidden="true">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h3>Sessions</h3>
+        <button id="closeSessionsButton" class="chip secondary">Close</button>
+      </div>
+      <div class="inline-actions">
+        <button id="newSessionButton" class="chip">New Chat Tab</button>
+        <button id="newSessionHereButton" class="chip secondary">New Here</button>
+        <button id="closeActiveSessionButton" class="chip secondary">Close Active</button>
+      </div>
+      <ul id="sessionsList" class="list compact"></ul>
+    </section>
+
+    <section id="moreSheet" class="sheet hidden" aria-hidden="true">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h3>More</h3>
+        <button id="closeMoreButton" class="chip secondary">Close</button>
+      </div>
+      <div class="card">
+        <label for="commandInput">Quick Command</label>
+        <div class="inline-actions">
+          <input id="commandInput" type="text" placeholder="Type command" />
+          <button id="sendCommandButton" class="chip">Send</button>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Selectable Terminal Output</h4>
+        <p class="muted">Use this to select and copy full links or any output text.</p>
+        <textarea id="terminalSelectableOutput" rows="7" readonly></textarea>
+        <div class="inline-actions">
+          <button id="refreshSelectableOutputButton" class="chip secondary">Refresh</button>
+          <button id="copySelectableOutputButton" class="chip secondary">Copy All</button>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Quick Installers</h4>
+        <p class="muted">Install popular coding CLIs into your workspace tools path.</p>
+        <div id="installerQuickList" class="installer-list"></div>
+      </div>
+      <div class="card">
+        <h4>Universal Link & OAuth Helper</h4>
+        <p class="muted">Codex, Claude, and generic OAuth helper for browser links, device codes, and localhost callbacks.</p>
+        <div class="helper-profiles">
+          <button id="profileCodexButton" class="chip secondary">Codex</button>
+          <button id="profileClaudeButton" class="chip secondary">Claude</button>
+          <button id="profileGenericButton" class="chip secondary">Generic OAuth</button>
+        </div>
+        <p id="helperStatusText" class="muted">Profile: Codex</p>
+        <div id="detectedLinksList" class="installer-list"></div>
+
+        <label for="detectedAuthUrlInput">Auth Link</label>
+        <textarea id="detectedAuthUrlInput" class="helper-textarea" rows="3" readonly placeholder="Run login command; full auth link appears here"></textarea>
+        <div class="inline-actions">
+          <button id="copyDetectedAuthUrlButton" class="chip secondary">Copy Link</button>
+          <button id="openDetectedAuthUrlButton" class="chip secondary">Open Link</button>
+          <button id="useDetectedAsCallbackButton" class="chip secondary">Use As Callback</button>
+        </div>
+
+        <label for="deviceCodeInput">Device Code / OTP</label>
+        <textarea id="deviceCodeInput" class="helper-textarea" rows="2" placeholder="Paste device code or OTP"></textarea>
+        <div class="inline-actions">
+          <button id="pasteDeviceCodeButton" class="chip secondary">Paste</button>
+          <button id="copyDeviceCodeButton" class="chip secondary">Copy</button>
+          <button id="sendDeviceCodeButton" class="chip">Send To Terminal</button>
+          <button id="helperReconnectButton" class="chip secondary">Reconnect</button>
+        </div>
+
+        <label for="oauthCallbackInput">Callback URL (localhost)</label>
+        <textarea id="oauthCallbackInput" class="helper-textarea" rows="3" placeholder="http://localhost:1455/auth/callback?code=..."></textarea>
+        <div class="inline-actions">
+          <button id="relayOAuthCallbackButton" class="chip">Complete Callback</button>
+          <button id="clearOAuthFieldsButton" class="chip secondary">Clear</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="keysSheet" class="sheet hidden" aria-hidden="true">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h3>Keys</h3>
+        <button id="closeKeysButton" class="chip secondary">Close</button>
+      </div>
+      <div id="terminalKeys" class="keys-grid">
+        <button data-key="up" class="chip secondary">Up</button>
+        <button data-key="down" class="chip secondary">Down</button>
+        <button data-key="left" class="chip secondary">Left</button>
+        <button data-key="right" class="chip secondary">Right</button>
+        <button data-key="ctrlc" class="chip secondary">Ctrl+C</button>
+        <button data-key="enter" class="chip secondary">Enter</button>
+        <button data-key="tab" class="chip secondary">Tab</button>
+        <button data-key="shiftTab" class="chip secondary">Shift+Tab</button>
+        <button data-key="esc" class="chip secondary">Esc</button>
+        <button data-key="backspace" class="chip secondary">Backspace</button>
+      </div>
+    </section>
+
+    <section id="handoffSheet" class="sheet hidden" aria-hidden="true">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h3>Switch To Mobile</h3>
+        <button id="closeHandoffButton" class="chip secondary">Close</button>
+      </div>
+      <div class="card">
+        <p class="muted">Scan this QR from your phone, then log in if needed. It will open terminal with the same cwd.</p>
+        <img id="handoffQrImage" alt="Handoff QR code" class="handoff-qr" />
+        <label for="handoffUrlInput">Handoff URL</label>
+        <input id="handoffUrlInput" type="text" readonly />
+        <div class="inline-actions">
+          <button id="copyHandoffUrlButton" class="chip secondary">Copy Link</button>
+          <button id="openHandoffUrlButton" class="chip secondary">Open Link</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/xterm/lib/xterm.js"></script>
+  <script src="https://unpkg.com/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+  <script type="module" src="/mobile/mobile.js?v=2026-02-27.01"></script>
+</body>
+</html>

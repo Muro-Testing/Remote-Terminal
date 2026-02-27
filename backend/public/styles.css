@@ -1,0 +1,711 @@
+:root {
+  --bg: #f3f5f8;
+  --bg-accent: radial-gradient(circle at 10% 10%, rgba(16, 163, 127, 0.12), transparent 30%),
+    radial-gradient(circle at 90% 0%, rgba(28, 100, 242, 0.1), transparent 35%);
+  --surface: rgba(255, 255, 255, 0.9);
+  --surface-2: #eef2f7;
+  --line: #d5dde8;
+  --text: #0f172a;
+  --muted: #5b687a;
+  --accent: #10a37f;
+  --accent-2: #1c64f2;
+  --btn-secondary-bg: #edf2f8;
+  --btn-secondary-text: #0f172a;
+  --terminal-bg: #0f172a;
+  --terminal-fg: #e2e8f0;
+  --terminal-line: #1f2a44;
+}
+
+html[data-theme="dark"] {
+  --bg: #0b0f16;
+  --bg-accent: radial-gradient(circle at 10% 10%, rgba(16, 163, 127, 0.18), transparent 28%),
+    radial-gradient(circle at 90% 0%, rgba(28, 100, 242, 0.18), transparent 32%);
+  --surface: rgba(17, 24, 39, 0.86);
+  --surface-2: #1c2536;
+  --line: #2a3549;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --btn-secondary-bg: #1d2738;
+  --btn-secondary-text: #dbe7ff;
+  --terminal-bg: #070b12;
+  --terminal-fg: #e2e8f0;
+  --terminal-line: #2d3952;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  font-family: "SF Pro Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-accent), var(--bg);
+}
+
+.background-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.app-shell {
+  width: min(1300px, 100%);
+  margin: 0 auto;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  backdrop-filter: blur(10px);
+  min-width: 0;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: linear-gradient(130deg, var(--accent), var(--accent-2));
+  color: white;
+  border-color: transparent;
+}
+
+.tab-panel {
+  display: none;
+  gap: 10px;
+}
+
+.tab-panel.active {
+  display: grid;
+}
+
+#exitTerminalFocusModeButton {
+  display: none;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+h2,
+h3 {
+  margin: 0;
+}
+
+.muted,
+.msg,
+.hint,
+label {
+  color: var(--muted);
+}
+
+.hint {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+}
+
+.group {
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+input,
+textarea,
+button,
+select {
+  font: inherit;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 11px;
+  background: linear-gradient(130deg, var(--accent), var(--accent-2));
+  color: white;
+  cursor: pointer;
+}
+
+button.secondary {
+  border: 1px solid var(--line);
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+}
+
+.status {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.status.idle {
+  background: #33415522;
+  color: var(--muted);
+}
+
+.status.running {
+  background: #10a37f33;
+  color: #0ea371;
+}
+
+.status.failed {
+  background: #b4231833;
+  color: #e35d52;
+}
+
+.command-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto auto;
+  gap: 8px;
+}
+
+.subtools summary,
+details summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.terminal-view {
+  background: var(--terminal-bg);
+  border: 1px solid var(--terminal-line);
+  border-radius: 12px;
+  min-height: 50vh;
+  padding: 8px;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.terminal-view .xterm,
+.terminal-view .xterm-screen,
+.terminal-view .xterm-viewport {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.terminal-view .xterm-viewport {
+  overflow-y: auto !important;
+  scrollbar-gutter: stable;
+}
+
+.terminal-view .xterm-rows {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.terminal-command-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.mobile-input-settings .row > div {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.terminal-text-mirror {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  min-height: 100px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px;
+  white-space: pre-wrap;
+  line-height: 1.45;
+  font-size: 0.86rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.session-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.terminal-scene-shell {
+  display: grid;
+  gap: 8px;
+}
+
+.terminal-scene-top,
+.terminal-scene-bottom {
+  display: grid;
+  gap: 6px;
+}
+
+.terminal-scene-body {
+  min-height: 0;
+}
+
+.focus-meta {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.focus-session-tabs {
+  display: none;
+}
+
+.focus-quick-actions {
+  display: none;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.focus-quick-actions button {
+  white-space: nowrap;
+  font-size: 0.82rem;
+  padding: 6px 10px;
+}
+
+.focus-swipe-hint {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 7px 9px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.session-tab {
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.session-tab.active {
+  background: linear-gradient(130deg, var(--accent), var(--accent-2));
+  color: white;
+  border-color: transparent;
+}
+
+.session-tab.compact {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  min-width: 40px;
+}
+
+.mobile-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mobile-keys button {
+  flex: 1 1 calc(33.333% - 6px);
+  touch-action: manipulation;
+}
+
+.files-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 10px;
+}
+
+.file-tree-pane,
+.file-main-pane {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--surface-2);
+  min-width: 0;
+}
+
+.file-tree,
+.file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file-tree {
+  max-height: 58vh;
+  overflow: auto;
+}
+
+.file-tree li {
+  margin: 2px 0;
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tree-toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+.tree-label {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.tree-label.active {
+  background: #10a37f22;
+}
+
+.file-list {
+  display: grid;
+  gap: 8px;
+  max-height: 34vh;
+  overflow: auto;
+}
+
+.file-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: var(--surface);
+  display: grid;
+  gap: 6px;
+}
+
+.file-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 600;
+}
+
+.file-row-click {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 0;
+}
+
+.breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.breadcrumbs button {
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.project-table {
+  display: grid;
+  gap: 8px;
+}
+
+.project-row,
+.tool-card {
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.toggle-grid {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.toggle-grid label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.module-hidden {
+  display: none !important;
+}
+
+body.terminal-focus-mode .app-header,
+body.terminal-focus-mode .tabs,
+body.terminal-focus-mode #filesPanel,
+body.terminal-focus-mode #projectsPanel,
+body.terminal-focus-mode #accessPanel,
+body.terminal-focus-mode #morePanel {
+  display: none !important;
+}
+
+body.terminal-focus-mode .app-shell {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body.terminal-focus-mode #terminalPanel {
+  display: grid !important;
+  min-height: calc(var(--vvh, 1vh) * 100);
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  padding: 10px;
+}
+
+body.terminal-focus-mode #terminalPanel > .row:first-child {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--surface);
+  padding-bottom: 8px;
+}
+
+body.terminal-focus-mode .terminal-scene-shell {
+  display: grid;
+  gap: 8px;
+}
+
+body.terminal-focus-mode .focus-meta {
+  display: flex;
+  padding: 4px 0;
+}
+
+body.terminal-focus-mode .focus-session-tabs {
+  display: flex;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding-bottom: 4px;
+}
+
+body.terminal-focus-mode .focus-quick-actions {
+  display: flex;
+}
+
+body.terminal-focus-mode .focus-swipe-hint {
+  display: flex;
+}
+
+body.terminal-focus-mode .focus-swipe-hint.hidden {
+  display: none !important;
+}
+
+body.terminal-focus-mode #enterTerminalFocusModeButton {
+  display: none;
+}
+
+body.terminal-focus-mode #exitTerminalFocusModeButton {
+  display: inline-block;
+}
+
+body.terminal-focus-mode .subtools,
+body.terminal-focus-mode #terminalMirrorDetails,
+body.terminal-focus-mode #sessionTabs {
+  display: none;
+}
+
+body.terminal-focus-mode .terminal-view {
+  min-height: calc(var(--vvh, 1vh) * 64);
+}
+
+body.touch-device.terminal-focus-mode {
+  overflow: hidden;
+}
+
+body.touch-device.terminal-focus-mode .app-shell {
+  height: calc(var(--vvh, 1vh) * 100);
+}
+
+body.touch-device.terminal-focus-mode #terminalPanel {
+  height: calc(var(--vvh, 1vh) * 100);
+  overflow: hidden;
+  grid-template-rows: auto 1fr;
+}
+
+body.touch-device.terminal-focus-mode .terminal-scene-shell {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto 1fr auto;
+}
+
+body.touch-device.terminal-focus-mode #terminalPanel > .command-bar,
+body.touch-device.terminal-focus-mode #terminalPanel > .subtools,
+body.touch-device.terminal-focus-mode #terminalPanel > #sessionTabs,
+body.touch-device.terminal-focus-mode #terminalPanel > #terminalCommandGroup,
+body.touch-device.terminal-focus-mode #terminalPanel > .mobile-input-settings,
+body.touch-device.terminal-focus-mode #terminalPanel > #terminalMirrorDetails,
+body.touch-device.terminal-focus-mode #terminalPanel > #mobileKeysDetails {
+  display: none !important;
+}
+
+body.touch-device.terminal-focus-mode .terminal-scene-top,
+body.touch-device.terminal-focus-mode .terminal-scene-bottom,
+body.touch-device.terminal-focus-mode .terminal-scene-body {
+  min-height: 0;
+}
+
+body.touch-device.terminal-focus-mode .terminal-view {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body.touch-device.terminal-focus-mode .terminal-view .xterm,
+body.touch-device.terminal-focus-mode .terminal-view .xterm-screen,
+body.touch-device.terminal-focus-mode .terminal-view .xterm-viewport {
+  height: 100% !important;
+}
+
+body.touch-device.terminal-focus-mode .terminal-view .xterm-viewport {
+  overflow-y: auto !important;
+}
+
+body.touch-device.terminal-focus-mode.keyboard-open .focus-quick-actions,
+body.touch-device.terminal-focus-mode.keyboard-open .focus-swipe-hint {
+  display: none !important;
+}
+
+body.touch-device.mobile-input-direct #terminalCommandGroup {
+  display: none;
+}
+
+@media (max-width: 920px) {
+  .files-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .file-tree {
+    max-height: 220px;
+  }
+
+  .command-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .command-bar input,
+  .command-bar select {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    padding: 8px;
+  }
+
+  .panel {
+    border-radius: 12px;
+    padding: 10px;
+  }
+
+  .tab-btn {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
+  }
+
+  .terminal-view {
+    min-height: 42vh;
+    padding: 10px 8px;
+  }
+
+  .terminal-command-row {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-keys button {
+    flex: 1 1 calc(50% - 6px);
+  }
+
+  body.terminal-focus-mode #terminalPanel {
+    padding: 8px;
+  }
+
+  body.terminal-focus-mode .terminal-view {
+    min-height: calc(var(--vvh, 1vh) * 68);
+    padding: 8px 6px;
+  }
+
+  .terminal-text-mirror {
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+}

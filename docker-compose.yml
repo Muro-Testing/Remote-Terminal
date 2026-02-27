@@ -1,0 +1,35 @@
+services:
+  remote-terminal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: remote-terminal-mvp
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      PORT: 8080
+      DATA_DIR: /app/data
+      DB_PATH: /app/data/app.sqlite
+      WORKSPACE_ROOT: /workspace
+      EXECUTION_TIMEOUT_MS: ${EXECUTION_TIMEOUT_MS:-30000}
+      MAX_READ_BYTES: ${MAX_READ_BYTES:-1048576}
+      MAX_WRITE_BYTES: ${MAX_WRITE_BYTES:-1048576}
+      NPM_CONFIG_PREFIX: /workspace/.tools/npm
+      APP_PASSWORD: ${APP_PASSWORD:-changeme}
+      APP_PASSWORD_HASH: ${APP_PASSWORD_HASH:-}
+      SESSION_SECRET: ${SESSION_SECRET:-change-this-session-secret}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
+      LOGIN_RATE_LIMIT_PER_MIN: ${LOGIN_RATE_LIMIT_PER_MIN:-5}
+      WS_CONNECT_RATE_LIMIT_PER_MIN: ${WS_CONNECT_RATE_LIMIT_PER_MIN:-60}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-0}
+      LOCAL_LAN_IP: ${LOCAL_LAN_IP:-}
+    volumes:
+      - remote_terminal_data:/app/data
+      - ./workspace:/workspace
+      - ./workspace/.codex:/home/app/.codex
+    extra_hosts:
+      - "auth.openai.com:104.18.41.241"
+    restart: unless-stopped
+
+volumes:
+  remote_terminal_data:

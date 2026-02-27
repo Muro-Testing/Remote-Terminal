@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Remote Terminal MVP</title>
+  <link rel="stylesheet" href="https://unpkg.com/xterm/css/xterm.css" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="background-glow"></div>
+  <main class="app-shell">
+    <header class="app-header panel">
+      <div>
+        <h1>Remote Terminal</h1>
+        <p class="muted">Terminal-first workspace</p>
+      </div>
+      <div class="header-actions">
+        <span id="statusBadge" class="status idle">idle</span>
+        <label for="themeModeSelect" class="theme-label">Theme</label>
+        <select id="themeModeSelect">
+          <option value="auto">Auto</option>
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
+      </div>
+    </header>
+
+    <nav class="tabs panel" id="tabBar">
+      <button class="tab-btn active" data-tab="terminal">Terminal</button>
+      <button class="tab-btn" data-tab="files">Files</button>
+      <button class="tab-btn" data-tab="projects">Projects</button>
+      <button class="tab-btn" data-tab="access">Access</button>
+      <button class="tab-btn" data-tab="more">More</button>
+    </nav>
+
+    <section class="tab-panel panel active" data-tab-panel="terminal" id="terminalPanel">
+      <div class="row">
+        <h2>Live Terminal</h2>
+        <div class="row wrap">
+          <p id="terminalCwdLabel" class="msg">cwd: not connected</p>
+          <button id="enterTerminalFocusModeButton" class="secondary">Focus Mode</button>
+          <button id="exitTerminalFocusModeButton" class="secondary">Exit Focus</button>
+        </div>
+      </div>
+
+      <div class="command-bar">
+        <select id="cwdFolderSelect">
+          <option value=".">workspace (.)</option>
+        </select>
+        <button id="createCwdFolderButton" class="secondary">Create New</button>
+        <input id="cwdInput" type="text" value="." placeholder="Working directory" />
+        <button id="connectTerminalButton">Connect</button>
+        <button id="restartTerminalButton" class="secondary">Restart</button>
+      </div>
+
+      <div id="terminalSceneShell" class="terminal-scene-shell">
+        <div id="terminalSceneTop" class="terminal-scene-top">
+          <div id="terminalFocusMeta" class="focus-meta">
+            <span id="focusStatusBadge" class="status idle">idle</span>
+            <span id="focusCwdLabel" class="msg">cwd: not connected</span>
+          </div>
+          <div id="focusSessionTabs" class="session-tabs focus-session-tabs"></div>
+          <div id="focusSwipeHint" class="focus-swipe-hint">
+            <span>Tip: swipe left/right on terminal to switch sessions.</span>
+            <button id="dismissFocusSwipeHintButton" class="secondary">Got it</button>
+          </div>
+        </div>
+        <div id="terminalSceneBody" class="terminal-scene-body">
+          <div id="terminalView" class="terminal-view"></div>
+        </div>
+        <div id="terminalSceneBottom" class="terminal-scene-bottom">
+          <div id="focusQuickActions" class="focus-quick-actions">
+            <button id="focusPasteButton" class="secondary">Paste</button>
+            <button id="focusCtrlCButton" class="secondary">Ctrl+C</button>
+            <button id="focusClearButton" class="secondary">Clear</button>
+            <button id="focusReconnectButton" class="secondary">Reconnect</button>
+          </div>
+        </div>
+      </div>
+
+      <details class="subtools">
+        <summary>More Actions</summary>
+        <div class="row wrap">
+          <button id="newSessionButton" class="secondary">New Session</button>
+          <button id="closeSessionButton" class="secondary">Close Session</button>
+          <button id="focusTerminalButton" class="secondary">Focus Terminal</button>
+        </div>
+        <p class="hint">
+          Focus Terminal: places keyboard focus into terminal input so key presses go directly to shell.
+        </p>
+      </details>
+
+      <div id="sessionTabs" class="session-tabs"></div>
+
+      <div id="terminalCommandGroup" class="group">
+        <label for="terminalCommandInput">Command Input</label>
+        <div class="row terminal-command-row">
+          <input id="terminalCommandInput" type="text" placeholder="Type command and press Send..." />
+          <button id="sendCommandButton">Send</button>
+        </div>
+      </div>
+
+      <div class="group mobile-input-settings">
+        <div class="row wrap">
+          <div>
+            <label for="terminalInputModeSelect">Input Mode</label>
+            <select id="terminalInputModeSelect">
+              <option value="command_bar">Command Bar</option>
+              <option value="direct_terminal">Direct Terminal</option>
+            </select>
+          </div>
+          <div>
+            <label for="terminalFontSizeSelect">Terminal Text</label>
+            <select id="terminalFontSizeSelect">
+              <option value="auto">Auto</option>
+              <option value="11">Small</option>
+              <option value="13">Medium</option>
+              <option value="15">Large</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <details id="terminalMirrorDetails" class="group">
+        <summary>Selectable Output</summary>
+        <pre id="terminalTextMirror" class="terminal-text-mirror"></pre>
+      </details>
+
+      <details id="mobileKeysDetails" class="group">
+        <summary>Show Mobile Keys</summary>
+        <div class="mobile-keys">
+          <button data-key="up" class="secondary">Up</button>
+          <button data-key="down" class="secondary">Down</button>
+          <button data-key="left" class="secondary">Left</button>
+          <button data-key="right" class="secondary">Right</button>
+          <button data-key="enter" class="secondary">Enter</button>
+          <button data-key="tab" class="secondary">Tab</button>
+          <button data-key="shiftTab" class="secondary">Shift+Tab</button>
+          <button data-key="esc" class="secondary">Esc</button>
+          <button data-key="backspace" class="secondary">Backspace</button>
+          <button data-key="ctrlc" class="secondary">Ctrl+C</button>
+        </div>
+      </details>
+    </section>
+
+    <section class="tab-panel panel" data-tab-panel="files" id="filesPanel">
+      <div class="row">
+        <h2>Files</h2>
+        <button id="refreshFilesButton" class="secondary">Refresh</button>
+      </div>
+      <div id="fileBreadcrumbs" class="breadcrumbs"></div>
+      <div class="files-layout">
+        <aside class="file-tree-pane">
+          <h3>Folders</h3>
+          <ul id="fileTree" class="file-tree"></ul>
+        </aside>
+        <section class="file-main-pane">
+          <ul id="fileList" class="file-list"></ul>
+          <details class="advanced-files">
+            <summary>Advanced Actions</summary>
+            <div class="group">
+              <label for="pathInput">Manual Path</label>
+              <input id="pathInput" type="text" value="." />
+            </div>
+            <div class="row wrap">
+              <button id="createFolderButton" class="secondary">Create Folder</button>
+              <button id="createFileButton" class="secondary">Create File</button>
+            </div>
+            <div class="group">
+              <label for="uploadInput">Upload Files</label>
+              <input id="uploadInput" type="file" multiple />
+              <button id="uploadFilesButton" class="secondary">Upload</button>
+            </div>
+          </details>
+          <div class="group">
+            <label for="editorPathInput">Editor Path</label>
+            <input id="editorPathInput" type="text" placeholder="notes/example.txt" />
+          </div>
+          <div class="group">
+            <label for="fileEditor">File Editor</label>
+            <textarea id="fileEditor" rows="12" placeholder="Open or write a file..."></textarea>
+          </div>
+          <div class="row">
+            <button id="readFileButton" class="secondary">Read File</button>
+            <button id="saveFileButton">Save File</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="tab-panel panel" data-tab-panel="projects" id="projectsPanel">
+      <div class="row">
+        <h2>Projects</h2>
+      </div>
+      <div class="group">
+        <label for="projectRepoUrlInput">Repository URL</label>
+        <input id="projectRepoUrlInput" type="text" placeholder="https://github.com/org/repo.git" />
+        <div class="row wrap">
+          <input id="projectBranchInput" type="text" placeholder="Branch (optional)" />
+          <input id="projectFolderInput" type="text" placeholder="Folder name (optional)" />
+          <button id="cloneProjectButton">Clone</button>
+        </div>
+      </div>
+      <div id="projectList" class="project-table"></div>
+    </section>
+
+    <section class="tab-panel panel" data-tab-panel="access" id="accessPanel">
+      <div class="row">
+        <h2>Access</h2>
+      </div>
+      <div class="group">
+        <label for="loginPasswordInput">Admin Password</label>
+        <input id="loginPasswordInput" type="password" placeholder="Enter password" />
+        <div class="row wrap">
+          <button id="loginButton">Login</button>
+          <button id="logoutButton" class="secondary">Logout</button>
+        </div>
+        <p id="authStatusLabel" class="msg">not authenticated</p>
+      </div>
+      <div class="group">
+        <label for="appAccessUrl">App URL</label>
+        <input id="appAccessUrl" type="text" readonly />
+        <div class="row wrap">
+          <button id="copyAppUrlButton" class="secondary">Copy App URL</button>
+          <button id="openAppUrlButton" class="secondary">Open App URL</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel panel" data-tab-panel="more" id="morePanel">
+      <div class="row">
+        <h2>More</h2>
+      </div>
+      <details open>
+        <summary>Module Visibility</summary>
+        <div class="toggle-grid">
+          <label><input id="toggleToolInstaller" type="checkbox" checked /> Tool Installer</label>
+          <label><input id="toggleNetworkAccess" type="checkbox" checked /> Network Access</label>
+          <label><input id="toggleOAuthHelper" type="checkbox" checked /> Codex Login Helper</label>
+        </div>
+      </details>
+
+      <section id="toolInstallerModule" class="group">
+        <h3>Tool Installer</h3>
+        <div id="toolInstallerList" class="tool-list"></div>
+      </section>
+
+      <section id="oauthModule" class="group">
+        <h3>Codex Login Helper</h3>
+        <label for="oauthCallbackInput">Paste localhost callback URL</label>
+        <input id="oauthCallbackInput" type="text" placeholder="http://localhost:1455/auth/callback?code=..." />
+        <button id="relayCallbackButton" class="secondary">Complete Login</button>
+      </section>
+
+      <section id="networkModule" class="group">
+        <h3>Network Access</h3>
+        <label for="staticAccessUrl">Static Site URL (:8000)</label>
+        <input id="staticAccessUrl" type="text" readonly />
+        <div class="row wrap">
+          <button id="copyStaticUrlButton" class="secondary">Copy Static URL</button>
+          <button id="openStaticUrlButton" class="secondary">Open Static URL</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/xterm/lib/xterm.js"></script>
+  <script src="https://unpkg.com/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+  <script src="https://unpkg.com/xterm-addon-web-links/lib/xterm-addon-web-links.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
