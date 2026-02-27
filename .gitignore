@@ -21,3 +21,5 @@ Thumbs.db
 .cloudflared/
 *.pem
 *.key
+docs/private-local/
+docs/*-local.md
