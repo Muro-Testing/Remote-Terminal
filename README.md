@@ -1,100 +1,110 @@
 # Remote Terminal (Mobile-First)
 
-Self-hosted remote terminal and file manager with password auth, websocket PTY sessions, and mobile-first UI.
+Self-hosted remote terminal + workspace file manager with secure auth and mobile-first UX.
 
-## Primary UI
-- Main app: `http://localhost:8080/`
-- Optional alias: `http://localhost:8080/m`
+```text
+┌──────────────────────────────────────────────┐
+│ Remote Terminal                             │
+│  • Mobile-first UI at /                     │
+│  • PTY terminal over WebSocket              │
+│  • Multi-session terminal + files/projects  │
+│  • Docker or host-PC runtime                │
+└──────────────────────────────────────────────┘
+```
 
-## What You Get
+## Main URL
+- `http://localhost:8080/` (primary mobile UI)
+- `http://localhost:8080/m` (alias)
+
+## Features
 - Password login with HTTP-only session cookie
-- Auth-protected API + websocket terminal
-- Multi-session PTY terminal
-- File browse/upload/download/delete within workspace
-- Project clone/pull/open workflows
-- Dockerized deployment with persistent workspace + SQLite
+- Auth-protected REST + WebSocket endpoints
+- Multi-session PTY terminal with reconnect/resume
+- Files: browse, upload, download, delete, folder ZIP download
+- Projects: clone/pull/open under workspace
+- Persistent workspace + SQLite when running with Docker volume
 
-## Quick Start (Windows)
-1. Create env:
-```powershell
-Copy-Item .env.example .env
-```
-2. Set secure values in `.env`:
-```env
-APP_PASSWORD=your-strong-password
-SESSION_SECRET=replace-with-long-random-secret
-AUTH_COOKIE_SECURE=0
-```
-3. Start:
-```powershell
-docker compose up -d --build
-```
-4. Open: `http://localhost:8080/`
+## Install Modes
 
-## One-Command Install
-### Windows
+## 1) Docker Mode (recommended)
+### One-line install (Windows PowerShell)
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+git clone https://github.com/<YOUR_GITHUB_REPO_URL>.git && cd .\Remote-Terminal && powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 
-### Linux/macOS
+### One-line install (Linux/macOS)
 ```bash
-bash ./scripts/install.sh
+git clone https://github.com/<YOUR_GITHUB_REPO_URL>.git && cd Remote-Terminal && bash ./scripts/install.sh
 ```
 
-## Public Access via Cloudflare Named Tunnel
-1. Route hostname:
-```cmd
-cloudflared tunnel route dns <TUNNEL_NAME> remote.your-domain.com
+## 2) Host-PC Mode (no Docker)
+Requires `Node.js 22+` and `Git`.
+
+### One-line install/run (Windows PowerShell)
+```powershell
+git clone https://github.com/<YOUR_GITHUB_REPO_URL>.git && cd .\Remote-Terminal && if (!(Test-Path .env)) { Copy-Item .env.example .env } && New-Item -ItemType Directory -Force workspace,backend\data | Out-Null && cd backend && npm ci && npm run build && node --env-file=../.env dist/server.js
 ```
-2. Ensure tunnel ingress:
+
+### One-line install/run (Linux/macOS)
+```bash
+git clone https://github.com/<YOUR_GITHUB_REPO_URL>.git && cd Remote-Terminal && [ -f .env ] || cp .env.example .env && mkdir -p workspace backend/data && cd backend && npm ci && npm run build && node --env-file=../.env dist/server.js
+```
+
+## Quick First Run
+1. Copy env and set secrets:
+```text
+APP_PASSWORD=strong-password
+SESSION_SECRET=long-random-secret
+AUTH_COOKIE_SECURE=0   (set to 1 behind HTTPS)
+```
+2. Start app (Docker or Host mode).
+3. Open `http://localhost:8080/`.
+4. Login and test terminal connect.
+
+## Public Access (Cloudflare Named Tunnel)
+```bash
+cloudflared tunnel route dns <TUNNEL_NAME> remote.your-domain.com
+cloudflared tunnel run <TUNNEL_NAME>
+```
+
+Ingress example:
 ```yaml
 ingress:
   - hostname: remote.your-domain.com
     service: http://localhost:8080
   - service: http_status:404
 ```
-3. Run tunnel:
-```cmd
-cloudflared tunnel run <TUNNEL_NAME>
-```
 
-## Mandatory Security for Public Exposure
-- Use strong `APP_PASSWORD` (or `APP_PASSWORD_HASH`)
-- Use strong random `SESSION_SECRET`
-- Set `AUTH_COOKIE_SECURE=1` under HTTPS
+## Security Checklist
+- Strong `APP_PASSWORD` or `APP_PASSWORD_HASH`
+- Strong `SESSION_SECRET`
+- `AUTH_COOKIE_SECURE=1` on HTTPS/public access
 - Keep rate limits enabled
-- Do not commit `.env`, workspace data, tunnel credentials
+- Never commit `.env`, workspace data, DB files, or tunnel credentials
 
-See `SECURITY.md`.
+See [SECURITY.md](SECURITY.md).
 
-## Operations
-Start:
-```powershell
+## Useful Commands
+```text
+# Docker
 docker compose up -d --build
-```
-Stop:
-```powershell
 docker compose down
-```
-Update:
-```powershell
+
+# Update
 powershell -ExecutionPolicy Bypass -File .\scripts\update.ps1
-```
-Backup:
-```powershell
+
+# Backup
 powershell -ExecutionPolicy Bypass -File .\scripts\backup-data.ps1
 ```
 
-## Troubleshooting
-See `docs/TROUBLESHOOTING.md`.
-
-## API/WS
+## Health/API
 - `GET /api/health`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/session`
 - `GET /api/files?path=.`
-- `POST /api/files/upload?path=.`
-- `GET /api/projects`
+- `GET /api/files/download-folder?path=<folder>`
 - `WS /ws/terminal`
+
+## Troubleshooting
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [docs/CLOUDFLARE_TUNNEL_SETUP.md](docs/CLOUDFLARE_TUNNEL_SETUP.md).

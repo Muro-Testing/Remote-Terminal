@@ -8,6 +8,8 @@ backend/data/
 .env.local
 .env.*.local
 workspace/
+backend/tmp-workspace*/
+backend/tmp-workspace*
 *.sqlite
 *.sqlite3
 *.db
