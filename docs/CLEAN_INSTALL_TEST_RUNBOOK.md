@@ -34,7 +34,7 @@ Expected: all commands return a version.
 
 ## 2) Clone and Install (Docker mode)
 ```powershell
-git clone <YOUR_GITHUB_REPO_URL>
+git clone https://github.com/Muro-Testing/Remote-Terminal
 cd .\Remote-Terminal
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
@@ -137,4 +137,5 @@ Validate:
 - [ ] WebSocket terminal works on phone
 
 If any item fails, use `docs/TROUBLESHOOTING.md`.
+
 
