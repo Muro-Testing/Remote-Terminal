@@ -62,7 +62,7 @@ html, body {
   border-bottom: 1px solid var(--line);
   background: var(--surface);
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   gap: 8px;
   align-items: center;
 }
@@ -162,6 +162,15 @@ html, body {
   gap: 6px;
   align-items: center;
   min-width: 0;
+}
+
+body.keyboard-open.terminal-chrome-hidden #sceneTerminal .terminal-chrome-row {
+  display: none;
+}
+
+body.keyboard-open #sceneTerminal .scene-head {
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 .scene-head-row select, .scene-head-row input {

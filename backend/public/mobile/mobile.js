@@ -11,6 +11,7 @@ const els = {
     settings: document.getElementById("sceneSettings")
   },
   installAppButton: document.getElementById("installAppButton"),
+  toggleTerminalChromeButton: document.getElementById("toggleTerminalChromeButton"),
   mConnectionLabel: document.getElementById("mConnectionLabel"),
   terminalStatusBadge: document.getElementById("terminalStatusBadge"),
   terminalSessionLabel: document.getElementById("terminalSessionLabel"),
@@ -112,7 +113,9 @@ const state = {
   sessions: [],
   currentFilesPath: ".",
   authed: false,
-  runtimeState: null
+  runtimeState: null,
+  keyboardOpen: false,
+  terminalChromeVisible: true
 };
 
 const MOBILE_BUILD = "2026-02-27.01";
@@ -252,10 +255,42 @@ function vibrate() {
 }
 
 function updateViewportVar() {
-  const height = window.visualViewport?.height || window.innerHeight || 0;
+  const visualHeight = window.visualViewport?.height || window.innerHeight || 0;
+  const keyboardDelta = window.innerHeight - visualHeight;
+  const keyboardOpen = keyboardDelta > 140;
+  if (state.keyboardOpen !== keyboardOpen) {
+    state.keyboardOpen = keyboardOpen;
+    state.terminalChromeVisible = keyboardOpen ? false : true;
+    applyTerminalChromeMode();
+  }
+  const height = visualHeight;
   if (height > 0) {
     document.documentElement.style.setProperty("--vh", `${height * 0.01}px`);
   }
+}
+
+function syncTerminalChromeButton() {
+  if (!els.toggleTerminalChromeButton) {
+    return;
+  }
+  const showButton = state.activeScene === "terminal";
+  els.toggleTerminalChromeButton.classList.toggle("hidden", !showButton);
+  const isHidden = state.keyboardOpen && !state.terminalChromeVisible;
+  const label = isHidden ? "Show controls" : "Hide controls";
+  els.toggleTerminalChromeButton.title = label;
+  els.toggleTerminalChromeButton.setAttribute("aria-label", label);
+}
+
+function applyTerminalChromeMode() {
+  const terminalKeyboardMode = state.activeScene === "terminal" && state.keyboardOpen;
+  const hideChrome = terminalKeyboardMode && !state.terminalChromeVisible;
+  document.body.classList.toggle("keyboard-open", terminalKeyboardMode);
+  document.body.classList.toggle("terminal-chrome-hidden", hideChrome);
+  syncTerminalChromeButton();
+  window.setTimeout(() => {
+    fitAddon?.fit?.();
+    sendResize();
+  }, 0);
 }
 
 function resolvedTheme(mode) {
@@ -373,6 +408,7 @@ function setScene(scene, options = {}) {
   } else if (scene === "files") {
     void refreshFiles(state.currentFilesPath);
   }
+  applyTerminalChromeMode();
 }
 
 function openDrawer() {
@@ -1818,6 +1854,10 @@ function bindEvents() {
     forceCreateOnConnect = true;
     connectTerminal();
   });
+  els.toggleTerminalChromeButton?.addEventListener("click", () => {
+    state.terminalChromeVisible = !state.terminalChromeVisible;
+    applyTerminalChromeMode();
+  });
   els.resumeLiveButton?.addEventListener("click", resumeLiveSession);
   els.reopenContextButton?.addEventListener("click", reopenWorkspaceContext);
   els.takeControlButton?.addEventListener("click", requestTerminalControl);
@@ -2086,6 +2126,7 @@ async function bootstrap() {
   window.history.pushState({ appNav: true, kind: "root-guard", value: state.activeScene }, "", window.location.href);
   navInitialized = true;
   setScene(state.activeScene);
+  applyTerminalChromeMode();
   ensureTerminal();
 
   const authed = await ensureAuthenticatedDataLoaded();

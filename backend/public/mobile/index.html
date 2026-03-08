@@ -42,6 +42,9 @@
         <h1>Remote Terminal</h1>
         <p id="mConnectionLabel">not connected</p>
       </div>
+      <button id="toggleTerminalChromeButton" class="chip secondary hidden icon-chip" aria-label="Hide controls" title="Hide controls">
+        <svg class="icon"><use href="#i-more"></use></svg>
+      </button>
       <button id="installAppButton" class="chip secondary hidden icon-chip" aria-label="Install app" title="Install app">
         <svg class="icon"><use href="#i-install"></use></svg>
       </button>
@@ -66,11 +69,11 @@
     <main class="m-main">
       <section id="sceneTerminal" class="m-scene active">
         <div class="scene-head">
-          <div class="scene-head-row">
+          <div class="scene-head-row terminal-status-row">
             <span id="terminalStatusBadge" class="badge idle">idle</span>
             <span id="terminalSessionLabel" class="muted">no session</span>
           </div>
-          <div class="continuity-card">
+          <div class="continuity-card terminal-chrome-row">
             <div class="scene-head-row">
               <strong>Continuity</strong>
               <span id="continuityStatusText" class="muted">runtime unavailable</span>
@@ -82,11 +85,11 @@
               <button id="takeControlButton" class="chip secondary">Take Control</button>
             </div>
           </div>
-          <div class="scene-head-row">
+          <div class="scene-head-row terminal-chrome-row">
             <select id="terminalFolderSelect"></select>
             <button id="createTerminalFolderButton" class="chip secondary">New</button>
           </div>
-          <div class="scene-head-row">
+          <div class="scene-head-row terminal-chrome-row">
             <button id="connectTerminalButton" class="chip icon-chip" aria-label="Connect terminal" title="Connect"><svg class="icon"><use href="#i-connect"></use></svg></button>
             <button id="reconnectTerminalButton" class="chip secondary icon-chip" aria-label="Reconnect terminal" title="Reconnect"><svg class="icon"><use href="#i-refresh"></use></svg></button>
             <button id="resumeSessionButton" class="chip secondary icon-chip" aria-label="Resume last session" title="Resume"><svg class="icon"><use href="#i-resume"></use></svg></button>
