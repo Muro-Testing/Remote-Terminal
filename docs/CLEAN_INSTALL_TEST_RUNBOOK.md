@@ -21,6 +21,32 @@ Install:
 - Docker Desktop
 - Cloudflared (for free public URL)
 
+Windows one-liner installs (run in PowerShell as Administrator):
+```powershell
+winget install --id Git.Git -e --source winget
+winget install --id Docker.DockerDesktop -e --source winget
+winget install --id Cloudflare.cloudflared -e --source winget
+```
+
+macOS (Homebrew):
+```bash
+brew install git
+brew install --cask docker
+brew install cloudflared
+```
+
+Ubuntu/Debian:
+```bash
+sudo apt-get update
+sudo apt-get install -y git docker.io curl
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt-get update
+sudo apt-get install -y cloudflared
+sudo usermod -aG docker $USER
+```
+Then log out/login once so Docker group membership applies.
+
 Verify:
 ```powershell
 git --version
