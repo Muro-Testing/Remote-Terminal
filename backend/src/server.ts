@@ -11,6 +11,7 @@ import { fileRoutes } from "./routes/fileRoutes.js";
 import { networkRoutes } from "./routes/networkRoutes.js";
 import { oauthRelayRoutes } from "./routes/oauthRelayRoutes.js";
 import { projectRoutes } from "./routes/projectRoutes.js";
+import { runtimeRoutes } from "./routes/runtimeRoutes.js";
 import { registerExecutionSocket } from "./ws/executionSocket.js";
 import { registerTerminalSocket } from "./ws/terminalSocket.js";
 
@@ -40,6 +41,7 @@ app.use("/api", fileRoutes);
 app.use("/api", networkRoutes);
 app.use("/api", oauthRelayRoutes);
 app.use("/api", projectRoutes);
+app.use("/api", runtimeRoutes);
 app.use(express.static(path.resolve(process.cwd(), "public"), { index: false }));
 
 app.get("/m", (_req, res) => {

@@ -148,6 +148,15 @@ html, body {
   overflow-x: hidden;
 }
 
+.continuity-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
 .scene-head-row {
   display: flex;
   gap: 6px;

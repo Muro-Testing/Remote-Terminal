@@ -70,6 +70,18 @@
             <span id="terminalStatusBadge" class="badge idle">idle</span>
             <span id="terminalSessionLabel" class="muted">no session</span>
           </div>
+          <div class="continuity-card">
+            <div class="scene-head-row">
+              <strong>Continuity</strong>
+              <span id="continuityStatusText" class="muted">runtime unavailable</span>
+            </div>
+            <p id="continuityProjectText" class="muted">project: not resolved</p>
+            <div class="scene-head-row">
+              <button id="resumeLiveButton" class="chip secondary">Resume Live</button>
+              <button id="reopenContextButton" class="chip secondary">Reopen Context</button>
+              <button id="takeControlButton" class="chip secondary">Take Control</button>
+            </div>
+          </div>
           <div class="scene-head-row">
             <select id="terminalFolderSelect"></select>
             <button id="createTerminalFolderButton" class="chip secondary">New</button>

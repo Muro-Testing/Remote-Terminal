@@ -80,7 +80,7 @@ projectRoutes.post("/projects/open", (req, res) => {
     });
   }
   try {
-    const result = openProject(parsed.data.projectId);
+    const result = openProject(parsed.data.projectId, req.actorId ?? "admin");
     return res.json({ ok: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to open project.";

@@ -48,7 +48,7 @@
 - Backend/automation: Node.js API service
 - Database: SQLite
 - Hosting: Local Docker Compose
-- Version control: Not initialized in this workspace
+- Version control: Git repository initialized in this workspace
 
 ## Constraints
 - Time: Same-day MVP target (2026-02-25)
@@ -75,3 +75,4 @@
 - 2026-02-25: Stack selected as Node.js + Docker + SQLite.
 - 2026-02-25: Scope includes file manager in V1.
 - 2026-02-25: No external integrations in V1.
+- 2026-03-06: Continuity upgrade adds persisted actor/session metadata, runtime diagnostics, and multi-client terminal attach with single-controller input.

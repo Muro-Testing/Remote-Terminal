@@ -149,6 +149,15 @@ label {
   gap: 8px;
 }
 
+.continuity-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 78%, transparent), var(--surface-2));
+}
+
 .row {
   display: flex;
   align-items: center;

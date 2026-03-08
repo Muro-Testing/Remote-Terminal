@@ -1,6 +1,6 @@
 # Runtime Function Reference (Mobile + Terminal Backend)
 
-Last updated: 2026-02-26
+Last updated: 2026-03-06
 
 This document explains what the current code does so you can validate behavior and decide what to improve.
 
@@ -13,14 +13,16 @@ This document explains what the current code does so you can validate behavior a
 - File: `backend/src/ws/terminalSocket.ts`
 - Key: `actorId` (single-admin now).
 - Value:
-  - `sessions: Map<sessionId, { term, cwd, status }>`
+  - `sessions: Map<sessionId, { term, cwd, status, title, outputBuffer }>`
   - `activeSessionId`
-  - current attached websocket
+  - `clients: Map<clientId, { socket, clientType, deviceLabel }>`
+  - `controllerClientId`
   - detach cleanup timer
 
 Important:
 - Sessions survive websocket disconnects for `TERMINAL_DETACH_GRACE_MINUTES`.
 - If backend container restarts, memory sessions are lost.
+- New clients can receive a buffered session snapshot so the attached device sees the current shell output immediately.
 
 ### Files/projects
 - Real files are in workspace volume (`/workspace` in container).
@@ -29,6 +31,12 @@ Important:
 ### Auth session
 - Cookie-backed, stored in SQLite `sessions` table.
 - Refreshed on activity (`last_seen_at`, `expires_at`).
+
+### Continuity metadata
+- Stored in SQLite:
+  - `actor_state`
+  - `session_snapshots`
+- This metadata persists last project/cwd/session/client preferences across reconnects and backend restarts.
 
 ---
 
@@ -40,14 +48,16 @@ Important:
 Phone taps Connect
   -> mobile.js connectTerminal()
   -> WS /ws/terminal opens
+  -> send {type:hello, clientId, clientType, resumeSessionId, preferredCwd}
   -> send {type:list_sessions}
-  -> backend returns session_list for actor
-      if sessions exist:
-         mobile selects active/first session
-         status switched/running
-      else:
-         mobile sends {type:create_session,cwd}
-         backend creates PTY session
+  -> backend returns:
+      - session_list
+      - runtime_state
+      - optional buffer_snapshot for active session
+  -> client can:
+      - Resume Live Session
+      - Reopen Workspace Context
+      - New Session Here
 ```
 
 ### B) Disconnect / Reconnect preserve flow
@@ -57,9 +67,9 @@ WS closes (network/app background)
   -> backend does NOT kill sessions immediately
   -> schedules cleanup after TERMINAL_DETACH_GRACE_MINUTES
   -> phone reconnects later
-  -> backend re-attaches socket to same actor runtime
+  -> backend keeps runtime alive and adds a new attached client
   -> session_list returns old sessions
-  -> mobile resumes existing session
+  -> controller ownership decides who can type
 ```
 
 ### C) Callback relay flow
@@ -274,7 +284,7 @@ Class `AuthService`:
 
 ## 8) Suggested next improvements (if you want)
 
-1. Add explicit `Resume Last Session` button and pin last session id in localStorage.
-2. Add backend API to expose runtime/session diagnostics for UI debug.
+1. Add richer runtime diagnostics/history panel for attached clients and session snapshots.
+2. Add optional controller transfer confirmation when another device currently owns input.
 3. Add optional browser back guard in standalone mode (`beforeunload` + history state strategy).
 4. Show callback relay detail panel (target port, exact failure reason) in helper.

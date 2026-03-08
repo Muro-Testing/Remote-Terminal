@@ -19,6 +19,11 @@ const els = {
   connectTerminalButton: document.getElementById("connectTerminalButton"),
   reconnectTerminalButton: document.getElementById("reconnectTerminalButton"),
   resumeSessionButton: document.getElementById("resumeSessionButton"),
+  resumeLiveButton: document.getElementById("resumeLiveButton"),
+  reopenContextButton: document.getElementById("reopenContextButton"),
+  takeControlButton: document.getElementById("takeControlButton"),
+  continuityStatusText: document.getElementById("continuityStatusText"),
+  continuityProjectText: document.getElementById("continuityProjectText"),
   toggleScrollModeButton: document.getElementById("toggleScrollModeButton"),
   terminalViewport: document.getElementById("terminalViewport"),
   openSessionsButton: document.getElementById("openSessionsButton"),
@@ -91,7 +96,8 @@ const keys = {
   terminalFontSize: "m.settings.terminalFontSize",
   haptics: "m.settings.haptics",
   scrollMode: "m.terminal.scrollMode",
-  lastSessionId: "m.terminal.lastSessionId"
+  lastSessionId: "m.terminal.lastSessionId",
+  terminalClientId: "m.terminal.clientId"
 };
 
 const state = {
@@ -101,10 +107,12 @@ const state = {
   haptics: localStorage.getItem(keys.haptics) === "1",
   scrollMode: localStorage.getItem(keys.scrollMode) || "terminal",
   lastSessionId: localStorage.getItem(keys.lastSessionId) || "",
+  terminalClientId: localStorage.getItem(keys.terminalClientId) || "",
   activeSessionId: null,
   sessions: [],
   currentFilesPath: ".",
-  authed: false
+  authed: false,
+  runtimeState: null
 };
 
 const MOBILE_BUILD = "2026-02-27.01";
@@ -212,6 +220,29 @@ function api(path, options = {}) {
   });
 }
 
+async function fetchRuntimeState() {
+  if (!state.authed) {
+    state.runtimeState = null;
+    updateContinuityUi();
+    return null;
+  }
+  try {
+    const data = await api("/api/runtime/state");
+    state.runtimeState = data;
+    if (data?.defaultCwd && els.terminalFolderSelect) {
+      els.terminalFolderSelect.value = data.defaultCwd;
+    }
+    if (data?.actorState?.lastSessionId && !state.lastSessionId) {
+      rememberLastSession(data.actorState.lastSessionId);
+    }
+    updateContinuityUi();
+    return data;
+  } catch (error) {
+    setStatus("failed", `runtime state failed: ${error.message}`);
+    return null;
+  }
+}
+
 function vibrate() {
   if (state.haptics && navigator.vibrate) {
     navigator.vibrate(14);
@@ -272,6 +303,34 @@ function rememberLastSession(sessionId) {
   }
   state.lastSessionId = sessionId;
   localStorage.setItem(keys.lastSessionId, sessionId);
+}
+
+function getTerminalClientId() {
+  if (!state.terminalClientId) {
+    state.terminalClientId =
+      (window.crypto && typeof window.crypto.randomUUID === "function"
+        ? window.crypto.randomUUID()
+        : `mobile-${Date.now()}`);
+    localStorage.setItem(keys.terminalClientId, state.terminalClientId);
+  }
+  return state.terminalClientId;
+}
+
+function updateContinuityUi() {
+  if (els.continuityStatusText) {
+    const runtimeLabel = state.runtimeState?.runtimeAlive ? "runtime live" : "runtime unavailable";
+    const controlLabel = state.runtimeState?.controller?.canWrite ? "you control input" : "view-only";
+    els.continuityStatusText.textContent = state.runtimeState ? `${runtimeLabel} | ${controlLabel}` : "runtime unavailable";
+  }
+  if (els.continuityProjectText) {
+    const projectName =
+      state.runtimeState?.project?.name || state.runtimeState?.project?.id || "not resolved";
+    const cwd = state.runtimeState?.defaultCwd || ".";
+    els.continuityProjectText.textContent = `project: ${projectName} | cwd: ${cwd}`;
+  }
+  if (els.takeControlButton) {
+    els.takeControlButton.textContent = state.runtimeState?.controller?.canWrite ? "Control Locked" : "Take Control";
+  }
 }
 
 function pickPreferredSessionId(sessions, serverActiveSessionId) {
@@ -515,6 +574,17 @@ function connectTerminal() {
     reconnectTimer = null;
     startSocketHeartbeat();
     setStatus("running", "connected");
+    socket.send(
+      JSON.stringify({
+        type: "hello",
+        clientId: getTerminalClientId(),
+        clientType: "mobile",
+        deviceLabel: "Mobile Browser",
+        resumeSessionId: state.lastSessionId || undefined,
+        preferredCwd: els.terminalFolderSelect.value || state.runtimeState?.defaultCwd || ".",
+        preferredProjectId: state.runtimeState?.project?.id || undefined
+      })
+    );
     socket.send(JSON.stringify({ type: "list_sessions" }));
     terminal?.focus?.();
   });
@@ -527,10 +597,8 @@ function connectTerminal() {
     syncSessionLabel();
     setStatus("failed", "disconnected");
     socket = null;
-    const replacedByAnotherClient =
-      event?.code === 1012 ||
-      /replaced by new client/i.test(String(event?.reason || ""));
-    if (suppressNextAutoReconnect || replacedByAnotherClient) {
+    updateContinuityUi();
+    if (suppressNextAutoReconnect) {
       suppressNextAutoReconnect = false;
       return;
     }
@@ -552,13 +620,14 @@ function connectTerminal() {
       if (!initializedFromServer) {
         initializedFromServer = true;
         if (!state.sessions.length && socket?.readyState === WebSocket.OPEN) {
-          const cwd = els.terminalFolderSelect.value || ".";
+          const cwd = els.terminalFolderSelect.value || state.runtimeState?.defaultCwd || ".";
           socket.send(JSON.stringify({ type: "create_session", cwd }));
-        } else if (state.activeSessionId) {
-          rememberLastSession(state.activeSessionId);
-          renderActiveSessionBuffer();
-          setStatus("running", `session ${state.activeSessionId.slice(0, 6)}`);
         }
+      }
+      if (state.activeSessionId) {
+        rememberLastSession(state.activeSessionId);
+        renderActiveSessionBuffer();
+        setStatus("running", `session ${state.activeSessionId.slice(0, 6)}`);
       }
       renderSessions();
       syncSessionLabel();
@@ -581,6 +650,40 @@ function connectTerminal() {
         syncSessionLabel();
       } else if (payload.status === "error") {
         setStatus("failed", payload.message || "error");
+      }
+      return;
+    }
+    if (payload.type === "buffer_snapshot" && payload.sessionId) {
+      terminalSessionBuffers.set(payload.sessionId, payload.data || "");
+      if (payload.sessionId === state.activeSessionId) {
+        renderActiveSessionBuffer();
+      }
+      return;
+    }
+    if (payload.type === "runtime_state") {
+      state.runtimeState = payload;
+      updateContinuityUi();
+      if (payload.defaultCwd) {
+        els.terminalFolderSelect.value = payload.defaultCwd;
+      }
+      return;
+    }
+    if (payload.type === "control_changed") {
+      if (state.runtimeState) {
+        state.runtimeState.attachedClients = payload.attachedClients || state.runtimeState.attachedClients;
+        state.runtimeState.controller = {
+          controllerClientId: payload.controllerClientId ?? null,
+          canWrite: payload.controllerClientId === getTerminalClientId()
+        };
+      }
+      updateContinuityUi();
+      return;
+    }
+    if (payload.type === "session_resume_result") {
+      if (payload.ok) {
+        setStatus("running", `resumed ${String(payload.sessionId || "").slice(0, 6)}`);
+      } else {
+        setStatus("failed", "resume failed");
       }
       return;
     }
@@ -645,6 +748,10 @@ function parseMessage(data) {
 
 function sendTerminalInput(data) {
   if (!socket || socket.readyState !== WebSocket.OPEN || !state.activeSessionId) return;
+  if (state.runtimeState?.controller && !state.runtimeState.controller.canWrite) {
+    setStatus("failed", "view-only: take control first");
+    return;
+  }
   socket.send(JSON.stringify({ type: "input", sessionId: state.activeSessionId, data }));
 }
 
@@ -904,7 +1011,8 @@ function getActiveSessionCwd() {
 
 function buildHandoffPayload() {
   const cwd = encodeURIComponent(getActiveSessionCwd());
-  const url = `${window.location.origin}/?handoff=1&cwd=${cwd}`;
+  const sessionId = state.activeSessionId ? `&session=${encodeURIComponent(state.activeSessionId)}` : "";
+  const url = `${window.location.origin}/?handoff=1&cwd=${cwd}${sessionId}`;
   if (els.handoffUrlInput) {
     els.handoffUrlInput.value = url;
   }
@@ -1062,7 +1170,10 @@ function renderSessions() {
     li.className = "item";
     const title = document.createElement("div");
     title.className = "item-title";
-    title.textContent = `${session.id.slice(0, 8)}  ${session.cwd || "."}`;
+    title.textContent = `${session.title || session.id.slice(0, 8)}  ${session.cwd || "."}`;
+    const meta = document.createElement("div");
+    meta.className = "muted";
+    meta.textContent = `${session.status || "unknown"}${session.lastActivityAt ? ` | ${new Date(session.lastActivityAt).toLocaleString()}` : ""}`;
     const row = document.createElement("div");
     row.className = "inline-actions";
     const openBtn = document.createElement("button");
@@ -1070,7 +1181,7 @@ function renderSessions() {
     openBtn.textContent = session.id === state.activeSessionId ? "Active" : "Open";
     openBtn.addEventListener("click", () => switchSession(session.id));
     row.appendChild(openBtn);
-    li.append(title, row);
+    li.append(title, meta, row);
     els.sessionsList.appendChild(li);
   }
 }
@@ -1115,6 +1226,48 @@ function resumeLastSession() {
   }
   switchSession(existing.id);
   setStatus("running", `resumed ${existing.id.slice(0, 6)}`);
+}
+
+function resumeLiveSession() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    setStatus("failed", "connect terminal first");
+    return;
+  }
+  const targetId = state.lastSessionId || state.runtimeState?.actorState?.lastSessionId || state.activeSessionId;
+  if (!targetId) {
+    setStatus("idle", "no live session to resume");
+    return;
+  }
+  socket.send(JSON.stringify({ type: "resume_session", sessionId: targetId }));
+}
+
+async function reopenWorkspaceContext() {
+  if (!state.authed) {
+    setScene("access");
+    return;
+  }
+  try {
+    const data = await api("/api/runtime/recover", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    const cwd = data.cwd || state.runtimeState?.defaultCwd || ".";
+    if (els.terminalFolderSelect) {
+      els.terminalFolderSelect.value = cwd;
+    }
+    setStatus("running", `context ${cwd}`);
+    await fetchRuntimeState();
+  } catch (error) {
+    setStatus("failed", `recover failed: ${error.message}`);
+  }
+}
+
+function requestTerminalControl() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    setStatus("failed", "connect terminal first");
+    return;
+  }
+  socket.send(JSON.stringify({ type: "request_control" }));
 }
 
 function bindSwipeSessions() {
@@ -1530,9 +1683,17 @@ async function fetchSession() {
     const data = await api("/api/auth/session");
     const authed = Boolean(data.authenticated);
     setAuthState(authed, authed ? `authenticated (${data.actorId || "admin"})` : "not authenticated");
+    if (authed) {
+      await fetchRuntimeState();
+    } else {
+      state.runtimeState = null;
+      updateContinuityUi();
+    }
     return authed;
   } catch {
     setAuthState(false, "not authenticated");
+    state.runtimeState = null;
+    updateContinuityUi();
     return false;
   }
 }
@@ -1544,6 +1705,7 @@ async function login() {
     await api("/api/auth/login", { method: "POST", body: JSON.stringify({ password }) });
     els.passwordInput.value = "";
     setAuthState(true, "authenticated");
+    await fetchRuntimeState();
     await refreshFolderPicker();
     await refreshFiles(".");
     setScene("terminal");
@@ -1568,6 +1730,8 @@ async function logout() {
     socket.close();
     socket = null;
   }
+  state.runtimeState = null;
+  updateContinuityUi();
   setAuthState(false, "not authenticated");
   setStatus("idle", "not connected");
   setScene("access");
@@ -1629,6 +1793,9 @@ function bindEvents() {
   }
 
   els.connectTerminalButton.addEventListener("click", connectTerminal);
+  els.resumeLiveButton?.addEventListener("click", resumeLiveSession);
+  els.reopenContextButton?.addEventListener("click", reopenWorkspaceContext);
+  els.takeControlButton?.addEventListener("click", requestTerminalControl);
   els.resumeSessionButton?.addEventListener("click", resumeLastSession);
   els.reconnectTerminalButton.addEventListener("click", () => {
     allowAutoReconnect = true;
@@ -1902,13 +2069,18 @@ async function bootstrap() {
   const url = new URL(window.location.href);
   if (url.searchParams.get("handoff") === "1") {
     const handoffCwd = normalizePathValue(url.searchParams.get("cwd") || ".");
+    const handoffSession = (url.searchParams.get("session") || "").trim();
     if (els.terminalFolderSelect) {
       els.terminalFolderSelect.value = handoffCwd;
+    }
+    if (handoffSession) {
+      rememberLastSession(handoffSession);
     }
     setScene("terminal");
     connectTerminal();
     url.searchParams.delete("handoff");
     url.searchParams.delete("cwd");
+    url.searchParams.delete("session");
     window.history.replaceState({}, "", url.toString());
     return;
   }

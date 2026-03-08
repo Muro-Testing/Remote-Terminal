@@ -6,6 +6,7 @@ import { db } from "../db/client.js";
 import { config } from "../config.js";
 import { executionService } from "./executionService.js";
 import { isWithinRoot } from "./pathSafety.js";
+import { recordProjectOpen } from "./continuityService.js";
 
 interface ProjectRow {
   id: string;
@@ -181,7 +182,7 @@ export async function pullProject(projectId: string): Promise<ProjectRecord> {
   };
 }
 
-export function openProject(projectId: string): { project: ProjectRecord; cwd: string } {
+export function openProject(projectId: string, actorId = "admin"): { project: ProjectRecord; cwd: string } {
   const row = db
     .prepare(
       `SELECT id, name, repo_url, branch, local_path, created_at, updated_at
@@ -205,6 +206,8 @@ export function openProject(projectId: string): { project: ProjectRecord; cwd: s
     projectId: row.id,
     name: row.name
   });
+
+  recordProjectOpen(actorId, row.id, relativeCwd);
 
   return {
     project: mapProjectRow(row),

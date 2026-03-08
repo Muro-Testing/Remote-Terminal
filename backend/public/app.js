@@ -39,6 +39,11 @@ const els = {
   cwdInput: document.getElementById("cwdInput"),
   connectTerminalButton: document.getElementById("connectTerminalButton"),
   restartTerminalButton: document.getElementById("restartTerminalButton"),
+  resumeLiveSessionButton: document.getElementById("resumeLiveSessionButton"),
+  reopenContextButton: document.getElementById("reopenContextButton"),
+  takeControlButton: document.getElementById("takeControlButton"),
+  continuitySummary: document.getElementById("continuitySummary"),
+  continuityProjectLabel: document.getElementById("continuityProjectLabel"),
   focusTerminalButton: document.getElementById("focusTerminalButton"),
   statusBadge: document.getElementById("statusBadge"),
   focusStatusBadge: document.getElementById("focusStatusBadge"),
@@ -97,7 +102,9 @@ const storageKeys = {
   terminalFocusMode: "ui.terminalFocusMode",
   terminalInputMode: "ui.terminalInputMode",
   terminalFontSize: "ui.terminalFontSize",
-  focusSwipeHintDismissed: "ui.focusSwipeHintDismissed"
+  focusSwipeHintDismissed: "ui.focusSwipeHintDismissed",
+  lastSessionId: "ui.lastSessionId",
+  terminalClientId: "ui.terminalClientId"
 };
 
 const uiState = {
@@ -107,7 +114,9 @@ const uiState = {
   terminalFocusMode: localStorage.getItem(storageKeys.terminalFocusMode) === "1",
   terminalInputMode: localStorage.getItem(storageKeys.terminalInputMode) || "command_bar",
   terminalFontSize: localStorage.getItem(storageKeys.terminalFontSize) || "auto",
-  focusSwipeHintDismissed: localStorage.getItem(storageKeys.focusSwipeHintDismissed) === "1"
+  focusSwipeHintDismissed: localStorage.getItem(storageKeys.focusSwipeHintDismissed) === "1",
+  lastSessionId: localStorage.getItem(storageKeys.lastSessionId) || "",
+  terminalClientId: localStorage.getItem(storageKeys.terminalClientId) || ""
 };
 
 let socket = null;
@@ -127,6 +136,7 @@ let touchSwipeStartY = null;
 let currentFilePath = ".";
 const expandedTreeNodes = new Set(["."]);
 const treeDirectoryCache = new Map();
+let runtimeState = null;
 
 const toolInstallers = [
   {
@@ -243,6 +253,55 @@ function dismissFocusSwipeHint() {
   uiState.focusSwipeHintDismissed = true;
   localStorage.setItem(storageKeys.focusSwipeHintDismissed, "1");
   updateFocusSwipeHintVisibility();
+}
+
+function getTerminalClientId() {
+  if (!uiState.terminalClientId) {
+    uiState.terminalClientId =
+      (window.crypto && typeof window.crypto.randomUUID === "function"
+        ? window.crypto.randomUUID()
+        : `desktop-${Date.now()}`);
+    localStorage.setItem(storageKeys.terminalClientId, uiState.terminalClientId);
+  }
+  return uiState.terminalClientId;
+}
+
+function rememberLastSession(sessionId) {
+  uiState.lastSessionId = sessionId || "";
+  if (uiState.lastSessionId) {
+    localStorage.setItem(storageKeys.lastSessionId, uiState.lastSessionId);
+  } else {
+    localStorage.removeItem(storageKeys.lastSessionId);
+  }
+}
+
+function pickPreferredSessionId(sessions, serverActiveSessionId) {
+  if (!Array.isArray(sessions) || !sessions.length) {
+    return null;
+  }
+  if (uiState.lastSessionId && sessions.some((session) => session.id === uiState.lastSessionId)) {
+    return uiState.lastSessionId;
+  }
+  if (serverActiveSessionId && sessions.some((session) => session.id === serverActiveSessionId)) {
+    return serverActiveSessionId;
+  }
+  return sessions[0]?.id || null;
+}
+
+function updateContinuityUi() {
+  if (els.continuitySummary) {
+    const runtimeLabel = runtimeState?.runtimeAlive ? "runtime live" : "runtime unavailable";
+    const controlLabel = runtimeState?.controller?.canWrite ? "you control input" : "view-only";
+    els.continuitySummary.textContent = runtimeState ? `${runtimeLabel} | ${controlLabel}` : "runtime unavailable";
+  }
+  if (els.continuityProjectLabel) {
+    const projectName = runtimeState?.project?.name || runtimeState?.project?.id || "not resolved";
+    const cwd = runtimeState?.defaultCwd || ".";
+    els.continuityProjectLabel.textContent = `project: ${projectName} | cwd: ${cwd}`;
+  }
+  if (els.takeControlButton) {
+    els.takeControlButton.textContent = runtimeState?.controller?.canWrite ? "Control Locked" : "Take Control";
+  }
 }
 
 function updateViewportHeightVar() {
@@ -649,6 +708,29 @@ async function fetchSessionStatus() {
   }
 }
 
+async function fetchRuntimeState() {
+  if (!isAuthenticated) {
+    runtimeState = null;
+    updateContinuityUi();
+    return null;
+  }
+  try {
+    runtimeState = await api("/api/runtime/state");
+    if (runtimeState?.defaultCwd) {
+      setCwdValue(runtimeState.defaultCwd);
+      syncCwdFolderSelect(runtimeState.defaultCwd);
+    }
+    if (runtimeState?.actorState?.lastSessionId && !uiState.lastSessionId) {
+      rememberLastSession(runtimeState.actorState.lastSessionId);
+    }
+    updateContinuityUi();
+    return runtimeState;
+  } catch (error) {
+    termSystem(`runtime state failed: ${error.message}`);
+    return null;
+  }
+}
+
 async function login() {
   const password = (els.loginPasswordInput.value || "").trim();
   if (!password) {
@@ -665,6 +747,7 @@ async function login() {
     setAuthStatus("authenticated as admin", true);
     termSystem("login successful");
     await initNetworkAccess();
+    await fetchRuntimeState();
     await refreshProjects();
     await refreshFiles(".");
     await refreshWorkspaceFolderPicker();
@@ -686,6 +769,8 @@ async function logout() {
     // Ignore logout errors.
   }
   closeTerminalSocket();
+  runtimeState = null;
+  updateContinuityUi();
   setAuthStatus("not authenticated", false);
   setActiveTab("access");
 }
@@ -700,10 +785,15 @@ function closeTerminalSocket() {
   sessionBuffers.clear();
   sessionTextBuffers.clear();
   renderSessionTabs();
+  updateContinuityUi();
 }
 
 function sendTerminalInput(data) {
   if (!socket || socket.readyState !== WebSocket.OPEN || !activeSessionId) {
+    return;
+  }
+  if (runtimeState?.controller && !runtimeState.controller.canWrite) {
+    termSystem("input locked to another device. Use Take Control.");
     return;
   }
   socket.send(JSON.stringify({ type: "input", sessionId: activeSessionId, data }));
@@ -728,9 +818,21 @@ function connectTerminal() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   socket = new WebSocket(`${protocol}//${window.location.host}/ws/terminal`);
   setStatus("running");
+  let initializedFromServer = false;
 
   socket.onopen = () => {
-    createSession();
+    socket.send(
+      JSON.stringify({
+        type: "hello",
+        clientId: getTerminalClientId(),
+        clientType: "desktop",
+        deviceLabel: "Desktop Browser",
+        resumeSessionId: uiState.lastSessionId || undefined,
+        preferredCwd: els.cwdInput.value.trim() || runtimeState?.defaultCwd || ".",
+        preferredProjectId: runtimeState?.project?.id || undefined
+      })
+    );
+    socket.send(JSON.stringify({ type: "list_sessions" }));
     setTimeout(() => {
       if (fitAddon && typeof fitAddon.fit === "function") {
         fitAddon.fit();
@@ -767,6 +869,10 @@ function connectTerminal() {
             els.focusCwdLabel.textContent = `cwd: ${payload.cwd}`;
           }
           setStatus("running");
+          if (payload.sessionId) {
+            activeSessionId = payload.sessionId;
+            rememberLastSession(payload.sessionId);
+          }
           if (payload.sessionId === activeSessionId) {
             termSystem(`terminal started in ${payload.cwd}`);
           }
@@ -784,13 +890,54 @@ function connectTerminal() {
       }
       if (payload.type === "session_list") {
         terminalSessions = payload.sessions ?? [];
-        activeSessionId = payload.activeSessionId ?? null;
+        activeSessionId = pickPreferredSessionId(terminalSessions, payload.activeSessionId ?? null);
+        if (!initializedFromServer) {
+          initializedFromServer = true;
+          if (!terminalSessions.length && socket?.readyState === WebSocket.OPEN) {
+            createSession();
+          }
+        }
+        if (activeSessionId) {
+          rememberLastSession(activeSessionId);
+        }
         renderSessionTabs();
         renderActiveSessionBuffer();
       }
       if (payload.type === "session_closed") {
         sessionBuffers.delete(payload.sessionId);
         sessionTextBuffers.delete(payload.sessionId);
+        if (uiState.lastSessionId === payload.sessionId) {
+          rememberLastSession("");
+        }
+      }
+      if (payload.type === "buffer_snapshot" && payload.sessionId) {
+        sessionBuffers.set(payload.sessionId, payload.data || "");
+        sessionTextBuffers.set(payload.sessionId, stripAnsiCodes(payload.data || ""));
+        if (payload.sessionId === activeSessionId) {
+          renderActiveSessionBuffer();
+        }
+      }
+      if (payload.type === "runtime_state") {
+        runtimeState = payload;
+        updateContinuityUi();
+      }
+      if (payload.type === "control_changed") {
+        if (runtimeState) {
+          runtimeState.attachedClients = payload.attachedClients || runtimeState.attachedClients;
+          runtimeState.controller = {
+            controllerClientId: payload.controllerClientId ?? null,
+            canWrite: payload.controllerClientId === getTerminalClientId()
+          };
+        }
+        updateContinuityUi();
+      }
+      if (payload.type === "session_resume_result") {
+        if (payload.ok) {
+          setStatus("running");
+        } else {
+          termSystem(`resume failed: ${payload.reason || "session unavailable"}`);
+          setStatus("failed");
+        }
       }
     } catch {
       terminal.write(event.data);
@@ -803,6 +950,7 @@ function connectTerminal() {
     if (els.focusCwdLabel) {
       els.focusCwdLabel.textContent = "cwd: not connected";
     }
+    updateContinuityUi();
   };
 
   socket.onerror = () => {
@@ -814,7 +962,7 @@ function createSession() {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     return;
   }
-  const cwd = els.cwdInput.value.trim() || ".";
+  const cwd = els.cwdInput.value.trim() || runtimeState?.defaultCwd || ".";
   socket.send(
     JSON.stringify({
       type: "create_session",
@@ -829,6 +977,9 @@ function switchSession(sessionId) {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
     return;
   }
+  activeSessionId = sessionId;
+  rememberLastSession(sessionId);
+  renderActiveSessionBuffer();
   socket.send(JSON.stringify({ type: "switch_session", sessionId }));
 }
 
@@ -854,6 +1005,46 @@ function closeActiveSession() {
   socket.send(JSON.stringify({ type: "close_session", sessionId: activeSessionId }));
 }
 
+function resumeLiveSession() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    termSystem("connect terminal first");
+    return;
+  }
+  const targetId = uiState.lastSessionId || runtimeState?.actorState?.lastSessionId || activeSessionId;
+  if (!targetId) {
+    termSystem("no live session to resume");
+    return;
+  }
+  socket.send(JSON.stringify({ type: "resume_session", sessionId: targetId }));
+}
+
+async function reopenWorkspaceContext() {
+  if (!requireAuthGuard()) {
+    return;
+  }
+  try {
+    const data = await api("/api/runtime/recover", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    const cwd = data.cwd || runtimeState?.defaultCwd || ".";
+    setCwdValue(cwd);
+    syncCwdFolderSelect(cwd);
+    termSystem(`context restored to ${cwd}`);
+    await fetchRuntimeState();
+  } catch (error) {
+    termSystem(`context restore failed: ${error.message}`);
+  }
+}
+
+function requestTerminalControl() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    termSystem("connect terminal first");
+    return;
+  }
+  socket.send(JSON.stringify({ type: "request_control" }));
+}
+
 function renderSessionTabs() {
   const renderContainer = (container, compact = false) => {
     if (!container) {
@@ -865,8 +1056,8 @@ function renderSessionTabs() {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = `session-tab ${session.id === activeSessionId ? "active" : ""} ${compact ? "compact" : ""}`;
-      btn.textContent = `S${i + 1}`;
-      btn.title = session.cwd;
+      btn.textContent = compact ? `S${i + 1}` : `${session.title || `S${i + 1}`} ${session.status === "running" ? "" : "(stopped)"}`.trim();
+      btn.title = `${session.cwd}${session.lastActivityAt ? ` | ${new Date(session.lastActivityAt).toLocaleString()}` : ""}`;
       btn.addEventListener("click", () => switchSession(session.id));
       container.appendChild(btn);
     }
@@ -1706,6 +1897,9 @@ function bindTerminalControls() {
   });
   els.connectTerminalButton.addEventListener("click", connectTerminal);
   els.restartTerminalButton.addEventListener("click", connectTerminal);
+  els.resumeLiveSessionButton?.addEventListener("click", resumeLiveSession);
+  els.reopenContextButton?.addEventListener("click", reopenWorkspaceContext);
+  els.takeControlButton?.addEventListener("click", requestTerminalControl);
   els.focusTerminalButton.addEventListener("click", () => terminal.focus());
   els.newSessionButton.addEventListener("click", createSession);
   els.closeSessionButton.addEventListener("click", closeActiveSession);
@@ -1843,6 +2037,7 @@ async function bootstrapData() {
   }
 
   await initNetworkAccess();
+  await fetchRuntimeState();
   await refreshWorkspaceFolderPicker();
   await ensureTreeNode(".");
   renderFileTree();

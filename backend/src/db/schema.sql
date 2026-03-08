@@ -53,6 +53,27 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS actor_state (
+  actor_id TEXT PRIMARY KEY,
+  last_project_id TEXT,
+  last_cwd TEXT,
+  last_session_id TEXT,
+  last_client_type TEXT NOT NULL DEFAULT 'unknown',
+  auto_resume_mode TEXT NOT NULL DEFAULT 'live_or_context',
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS session_snapshots (
+  session_id TEXT PRIMARY KEY,
+  actor_id TEXT NOT NULL,
+  cwd TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('running', 'stopped', 'closed', 'error')),
+  title TEXT,
+  last_activity_at TEXT NOT NULL,
+  runtime_alive INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_execution_logs_execution_id
 ON execution_logs (execution_id);
 
@@ -64,3 +85,9 @@ ON sessions (expires_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_projects_updated_at
 ON projects (updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_actor_state_updated_at
+ON actor_state (updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_session_snapshots_actor_updated_at
+ON session_snapshots (actor_id, updated_at DESC);
