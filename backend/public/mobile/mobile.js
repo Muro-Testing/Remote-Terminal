@@ -153,6 +153,8 @@ let allowAutoReconnect = true;
 let suppressNextAutoReconnect = false;
 let helperProfile = "codex";
 let pageTouchStartY = 0;
+let connectIntentCwd = null;
+let forceCreateOnConnect = false;
 let sceneHistory = [];
 let navInitialized = false;
 let skipNextPopPush = false;
@@ -229,7 +231,7 @@ async function fetchRuntimeState() {
   try {
     const data = await api("/api/runtime/state");
     state.runtimeState = data;
-    if (data?.defaultCwd && els.terminalFolderSelect) {
+    if (data?.defaultCwd && els.terminalFolderSelect && (!els.terminalFolderSelect.value || els.terminalFolderSelect.value === ".")) {
       els.terminalFolderSelect.value = data.defaultCwd;
     }
     if (data?.actorState?.lastSessionId && !state.lastSessionId) {
@@ -552,6 +554,10 @@ function openHandoffSheet() {
   pushNavState("sheet", "handoff");
 }
 
+function getSelectedTerminalCwd() {
+  return normalizePathValue(els.terminalFolderSelect?.value || state.runtimeState?.defaultCwd || ".");
+}
+
 function connectTerminal() {
   ensureTerminal();
   if (!state.authed) {
@@ -560,6 +566,13 @@ function connectTerminal() {
   }
   allowAutoReconnect = true;
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    if (socket.readyState === WebSocket.OPEN && forceCreateOnConnect) {
+      const cwd = connectIntentCwd || getSelectedTerminalCwd();
+      socket.send(JSON.stringify({ type: "create_session", cwd }));
+      forceCreateOnConnect = false;
+      connectIntentCwd = null;
+      setStatus("running", `new session in ${cwd}`);
+    }
     return;
   }
   clearTimeout(reconnectTimer);
@@ -581,7 +594,7 @@ function connectTerminal() {
         clientType: "mobile",
         deviceLabel: "Mobile Browser",
         resumeSessionId: state.lastSessionId || undefined,
-        preferredCwd: els.terminalFolderSelect.value || state.runtimeState?.defaultCwd || ".",
+        preferredCwd: connectIntentCwd || getSelectedTerminalCwd(),
         preferredProjectId: state.runtimeState?.project?.id || undefined
       })
     );
@@ -619,9 +632,17 @@ function connectTerminal() {
       state.activeSessionId = pickPreferredSessionId(state.sessions, payload.activeSessionId);
       if (!initializedFromServer) {
         initializedFromServer = true;
-        if (!state.sessions.length && socket?.readyState === WebSocket.OPEN) {
-          const cwd = els.terminalFolderSelect.value || state.runtimeState?.defaultCwd || ".";
+        const desiredCwd = connectIntentCwd || getSelectedTerminalCwd();
+        const activeSession = state.sessions.find((session) => session.id === state.activeSessionId);
+        const activeCwd = normalizePathValue(activeSession?.cwd || ".");
+        const shouldCreateNew =
+          !state.sessions.length ||
+          (forceCreateOnConnect && desiredCwd !== "." && desiredCwd !== activeCwd);
+        if (shouldCreateNew && socket?.readyState === WebSocket.OPEN) {
+          const cwd = desiredCwd;
           socket.send(JSON.stringify({ type: "create_session", cwd }));
+          forceCreateOnConnect = false;
+          connectIntentCwd = null;
         }
       }
       if (state.activeSessionId) {
@@ -663,7 +684,7 @@ function connectTerminal() {
     if (payload.type === "runtime_state") {
       state.runtimeState = payload;
       updateContinuityUi();
-      if (payload.defaultCwd) {
+      if (payload.defaultCwd && els.terminalFolderSelect && (!els.terminalFolderSelect.value || els.terminalFolderSelect.value === ".")) {
         els.terminalFolderSelect.value = payload.defaultCwd;
       }
       return;
@@ -1792,7 +1813,11 @@ function bindEvents() {
     item.addEventListener("click", () => setScene(item.dataset.scene));
   }
 
-  els.connectTerminalButton.addEventListener("click", connectTerminal);
+  els.connectTerminalButton.addEventListener("click", () => {
+    connectIntentCwd = getSelectedTerminalCwd();
+    forceCreateOnConnect = true;
+    connectTerminal();
+  });
   els.resumeLiveButton?.addEventListener("click", resumeLiveSession);
   els.reopenContextButton?.addEventListener("click", reopenWorkspaceContext);
   els.takeControlButton?.addEventListener("click", requestTerminalControl);
@@ -1830,7 +1855,9 @@ function bindEvents() {
   });
   els.newSessionHereButton?.addEventListener("click", () => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ type: "create_session", cwd: els.terminalFolderSelect.value || "." }));
+    const cwd = getSelectedTerminalCwd();
+    socket.send(JSON.stringify({ type: "create_session", cwd }));
+    setStatus("running", `new session in ${cwd}`);
   });
   els.closeActiveSessionButton.addEventListener("click", () => {
     if (!socket || socket.readyState !== WebSocket.OPEN || !state.activeSessionId) return;
