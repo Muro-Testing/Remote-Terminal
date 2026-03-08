@@ -26,6 +26,8 @@
 ### A) Cloudflare Quick Tunnel (no domain)
 Command:
 - `cloudflared tunnel --url http://localhost:8080`
+- More stable variant:
+  - `cloudflared tunnel --url http://localhost:8080 --protocol http2 --edge-ip-version 4 --no-autoupdate`
 
 Pros:
 - Fastest setup
@@ -71,7 +73,10 @@ Notes:
 
 2. Symptom: quick tunnel URL fails or changes unexpectedly.
    - Cause: quick tunnels are temporary.
-   - Fix: use named tunnel or Tailscale Funnel for more stable access.
+   - Fix:
+     - run quick tunnel with `--protocol http2 --edge-ip-version 4 --no-autoupdate`
+     - keep a single tunnel process running
+     - if instability continues, use named tunnel or Tailscale Funnel.
 
 3. Symptom: localhost works but public URL fails.
    - Cause: DNS route missing, tunnel not running, or wrong ingress target.

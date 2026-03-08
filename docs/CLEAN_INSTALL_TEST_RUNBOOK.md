@@ -111,6 +111,11 @@ Start quick tunnel:
 cloudflared tunnel --url http://localhost:8080
 ```
 
+If the generated URL does not open or drops often, run the stable variant instead:
+```powershell
+cloudflared tunnel --url http://localhost:8080 --protocol http2 --edge-ip-version 4 --no-autoupdate
+```
+
 Copy the generated `https://*.trycloudflare.com` URL and open it on phone.
 
 Set HTTPS cookie mode, then restart:
@@ -129,6 +134,7 @@ Validate on phone:
 
 Note:
 - Quick tunnel URL is temporary and may change each run.
+- Keep the cloudflared terminal window open while testing.
 
 ---
 
@@ -163,5 +169,28 @@ Validate:
 - [ ] WebSocket terminal works on phone
 
 If any item fails, use `docs/TROUBLESHOOTING.md`.
+
+---
+
+## 8) Fast Recovery Commands (Copy/Paste)
+Check app health:
+```powershell
+curl http://localhost:8080/api/health
+```
+
+Rebuild/restart app:
+```powershell
+docker compose up -d --build
+```
+
+See logs:
+```powershell
+docker compose logs -f
+```
+
+Restart quick tunnel in stable mode:
+```powershell
+cloudflared tunnel --url http://localhost:8080 --protocol http2 --edge-ip-version 4 --no-autoupdate
+```
 
 

@@ -1,14 +1,14 @@
-# Remote Terminal (Mobile-First)
+ï»¿# Remote Terminal (Mobile-First)
 
 Self-hosted remote terminal + workspace file manager with secure auth and mobile-first UX.
 
 ```text
 +----------------------------------------------+
-¦ Remote Terminal                             ¦
-¦  • Mobile-first UI at /                     ¦
-¦  • PTY terminal over WebSocket              ¦
-¦  • Multi-session terminal + files/projects  ¦
-¦  • Docker or host-PC runtime                ¦
+| Remote Terminal                              |
+|  - Mobile-first UI at /                      |
+|  - PTY terminal over WebSocket               |
+|  - Multi-session terminal + files/projects   |
+|  - Docker or host-PC runtime                 |
 +----------------------------------------------+
 ```
 
@@ -69,6 +69,11 @@ cloudflared tunnel --url http://localhost:8080
 ```
 - Fastest path.
 - URL is temporary and changes between runs.
+- If the URL does not open reliably, use the more stable flags:
+```bash
+cloudflared tunnel --url http://localhost:8080 --protocol http2 --edge-ip-version 4 --no-autoupdate
+```
+- Keep the tunnel command window open while using the app.
 
 ### Option B: Cloudflare Named Tunnel (with domain)
 ```bash
@@ -91,6 +96,20 @@ tailscale funnel 443 on
 ```
 - Useful if you do not want DNS/domain setup.
 - Requires Tailscale account and client on host.
+
+## Quick Tunnel Troubleshooting (Most Common)
+1. `localhost` works, but `trycloudflare` URL fails:
+   - `cloudflared tunnel --url http://localhost:8080 --protocol http2 --edge-ip-version 4 --no-autoupdate`
+   - If still unstable, use Named Tunnel or Tailscale Funnel.
+2. Login works on localhost but fails on HTTPS public URL:
+   - Set `AUTH_COOKIE_SECURE=1` in `.env`
+   - Restart app: `docker compose up -d --build`
+3. Tunnel logs include DNS timeout (`region1.v2.argotunnel.com`) or random disconnects:
+   - Usually quick-tunnel transport instability, not app crash.
+   - Keep one tunnel process only (avoid multiple parallel cloudflared sessions).
+4. Public page opens but terminal reconnects often:
+   - Confirm host is healthy: `curl http://localhost:8080/api/health`
+   - Keep phone browser tab active and disable aggressive battery optimization.
 
 ## Security Checklist
 - Strong `APP_PASSWORD` or `APP_PASSWORD_HASH`
@@ -125,5 +144,3 @@ powershell -ExecutionPolicy Bypass -File .\scripts\backup-data.ps1
 
 ## Troubleshooting
 See [docs/CLEAN_INSTALL_TEST_RUNBOOK.md](docs/CLEAN_INSTALL_TEST_RUNBOOK.md), [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [docs/CLOUDFLARE_TUNNEL_SETUP.md](docs/CLOUDFLARE_TUNNEL_SETUP.md).
-
-
