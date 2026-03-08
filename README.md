@@ -29,12 +29,12 @@ Self-hosted remote terminal + workspace file manager with secure auth and mobile
 ## 1) Docker Mode (recommended)
 ### One-line install (Windows PowerShell)
 ```powershell
-git clone <YOUR_GITHUB_REPO_URL> && cd .\Remote-Terminal && powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+git clone https://github.com/Muro-Testing/Remote-Terminal && cd .\Remote-Terminal && powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 
 ### One-line install (Linux/macOS)
 ```bash
-git clone <YOUR_GITHUB_REPO_URL> && cd Remote-Terminal && bash ./scripts/install.sh
+git clone https://github.com/Muro-Testing/Remote-Terminal && cd Remote-Terminal && bash ./scripts/install.sh
 ```
 
 ## 2) Host-PC Mode (no Docker)
@@ -42,12 +42,12 @@ Requires `Node.js 22+` and `Git`.
 
 ### One-line install/run (Windows PowerShell)
 ```powershell
-git clone <YOUR_GITHUB_REPO_URL> && cd .\Remote-Terminal && if (!(Test-Path .env)) { Copy-Item .env.example .env } && New-Item -ItemType Directory -Force workspace,backend\data | Out-Null && cd backend && npm ci && npm run build && node --env-file=../.env dist/server.js
+git clone https://github.com/Muro-Testing/Remote-Terminal && cd .\Remote-Terminal && if (!(Test-Path .env)) { Copy-Item .env.example .env } && New-Item -ItemType Directory -Force workspace,backend\data | Out-Null && cd backend && npm ci && npm run build && node --env-file=../.env dist/server.js
 ```
 
 ### One-line install/run (Linux/macOS)
 ```bash
-git clone <YOUR_GITHUB_REPO_URL> && cd Remote-Terminal && [ -f .env ] || cp .env.example .env && mkdir -p workspace backend/data && cd backend && npm ci && npm run build && node --env-file=../.env dist/server.js
+git clone https://github.com/Muro-Testing/Remote-Terminal && cd Remote-Terminal && [ -f .env ] || cp .env.example .env && mkdir -p workspace backend/data && cd backend && npm ci && npm run build && node --env-file=../.env dist/server.js
 ```
 
 ## Quick First Run
@@ -125,4 +125,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\backup-data.ps1
 
 ## Troubleshooting
 See [docs/CLEAN_INSTALL_TEST_RUNBOOK.md](docs/CLEAN_INSTALL_TEST_RUNBOOK.md), [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), and [docs/CLOUDFLARE_TUNNEL_SETUP.md](docs/CLOUDFLARE_TUNNEL_SETUP.md).
+
 
