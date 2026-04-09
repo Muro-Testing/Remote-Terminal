@@ -431,12 +431,14 @@ export function registerTerminalSocket(server: Server): void {
         const sessionId = randomUUID();
         const now = new Date().toISOString();
         const term = pty.spawn(shell.file, shell.args, {
-          name: "xterm-color",
+          name: "xterm-256color",
           cols: Math.max(20, Number(cols) || 120),
           rows: Math.max(8, Number(rows) || 32),
           cwd: cwd.absolute,
           env: {
             ...process.env,
+            TERM: "xterm-256color",
+            COLORTERM: "truecolor",
             PATH: mergedPath
           }
         });
@@ -486,7 +488,6 @@ export function registerTerminalSocket(server: Server): void {
 
         broadcast(runtime, { type: "status", sessionId, status: "started", cwd: cwd.relative });
         sendSessionList(runtime);
-        term.write("\r");
       } catch (error) {
         const message = error instanceof Error ? error.message : "Terminal start failed.";
         sendToSocket(socket, { type: "status", status: "error", message, sessionId: null });

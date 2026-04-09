@@ -164,11 +164,12 @@ html, body {
   min-width: 0;
 }
 
-body.keyboard-open.terminal-chrome-hidden #sceneTerminal .terminal-chrome-row {
+body.terminal-chrome-hidden #sceneTerminal .terminal-chrome-row {
   display: none;
 }
 
-body.keyboard-open #sceneTerminal .scene-head {
+body.keyboard-open #sceneTerminal .scene-head,
+body.terminal-chrome-hidden #sceneTerminal .scene-head {
   padding-top: 6px;
   padding-bottom: 6px;
 }
@@ -188,6 +189,7 @@ body.keyboard-open #sceneTerminal .scene-head {
   background: var(--terminal-bg);
   min-height: 0;
   min-width: 0;
+  position: relative;
   overflow: hidden;
   border-top: 1px solid #00000022;
   border-bottom: 1px solid #00000022;
@@ -197,10 +199,21 @@ body.keyboard-open #sceneTerminal .scene-head {
 .terminal-viewport .xterm-screen,
 .terminal-viewport .xterm-viewport {
   height: 100% !important;
+  width: 100% !important;
 }
 
 .terminal-viewport .xterm-viewport {
   overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+}
+
+.terminal-viewport .xterm {
+  padding: 8px 10px;
+}
+
+.terminal-viewport .xterm-screen canvas {
+  max-width: 100%;
 }
 
 .terminal-actions {

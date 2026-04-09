@@ -115,11 +115,12 @@ const state = {
   authed: false,
   runtimeState: null,
   keyboardOpen: false,
-  terminalChromeVisible: true
+  terminalChromeVisible: false
 };
 
-const MOBILE_BUILD = "2026-02-27.01";
+const MOBILE_BUILD = "2026-04-09.01";
 const MAX_DETECTED_LINKS = 12;
+const MAX_SESSION_BUFFER_CHARS = 250000;
 const quickInstallers = [
   {
     name: "Claude Code",
@@ -164,6 +165,10 @@ let skipNextPopPush = false;
 const terminalSessionBuffers = new Map();
 let detectedAuthUrl = "";
 const detectedLinks = new Map();
+let replayInProgress = false;
+let queuedActiveOutput = [];
+let terminalResizeObserver = null;
+let terminalFitQueued = false;
 
 function joinRelativePath(base, name) {
   if (!base || base === ".") return name;
@@ -260,13 +265,16 @@ function updateViewportVar() {
   const keyboardOpen = keyboardDelta > 140;
   if (state.keyboardOpen !== keyboardOpen) {
     state.keyboardOpen = keyboardOpen;
-    state.terminalChromeVisible = keyboardOpen ? false : true;
+    if (keyboardOpen) {
+      state.terminalChromeVisible = false;
+    }
     applyTerminalChromeMode();
   }
   const height = visualHeight;
   if (height > 0) {
     document.documentElement.style.setProperty("--vh", `${height * 0.01}px`);
   }
+  queueTerminalFit();
 }
 
 function syncTerminalChromeButton() {
@@ -275,7 +283,7 @@ function syncTerminalChromeButton() {
   }
   const showButton = state.activeScene === "terminal";
   els.toggleTerminalChromeButton.classList.toggle("hidden", !showButton);
-  const isHidden = state.keyboardOpen && !state.terminalChromeVisible;
+  const isHidden = !state.terminalChromeVisible;
   const label = isHidden ? "Show controls" : "Hide controls";
   els.toggleTerminalChromeButton.title = label;
   els.toggleTerminalChromeButton.setAttribute("aria-label", label);
@@ -283,14 +291,12 @@ function syncTerminalChromeButton() {
 
 function applyTerminalChromeMode() {
   const terminalKeyboardMode = state.activeScene === "terminal" && state.keyboardOpen;
-  const hideChrome = terminalKeyboardMode && !state.terminalChromeVisible;
+  const keysSheetOpen = state.activeScene === "terminal" && !!els.keysSheet && !els.keysSheet.classList.contains("hidden");
+  const hideChrome = state.activeScene === "terminal" && (!state.terminalChromeVisible || keysSheetOpen || terminalKeyboardMode);
   document.body.classList.toggle("keyboard-open", terminalKeyboardMode);
   document.body.classList.toggle("terminal-chrome-hidden", hideChrome);
   syncTerminalChromeButton();
-  window.setTimeout(() => {
-    fitAddon?.fit?.();
-    sendResize();
-  }, 0);
+  queueTerminalFit();
 }
 
 function resolvedTheme(mode) {
@@ -405,6 +411,7 @@ function setScene(scene, options = {}) {
   if (scene === "terminal") {
     void refreshFolderPicker(els.terminalFolderSelect.value || ".");
     terminal?.focus?.();
+    queueTerminalFit();
   } else if (scene === "files") {
     void refreshFiles(state.currentFilesPath);
   }
@@ -447,9 +454,24 @@ function applyFontSize(value) {
   const size = normalized === "auto" ? (window.innerWidth <= 520 ? 11 : 13) : Number(normalized);
   if (terminal?.options && Number.isFinite(size)) {
     terminal.options.fontSize = size;
-    fitAddon?.fit?.();
-    sendResize();
+    queueTerminalFit();
   }
+}
+
+function queueTerminalFit() {
+  if (!fitAddon || !terminal || terminalFitQueued) {
+    return;
+  }
+  terminalFitQueued = true;
+  window.requestAnimationFrame(() => {
+    terminalFitQueued = false;
+    try {
+      fitAddon.fit();
+      sendResize();
+    } catch {
+      // Ignore transient layout races while mobile viewport is resizing.
+    }
+  });
 }
 
 function setStatus(status, text) {
@@ -468,22 +490,31 @@ function ensureTerminal() {
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
     fontSize: 12,
     cursorBlink: true,
-    convertEol: true,
+    convertEol: false,
+    scrollback: 5000,
+    allowTransparency: false,
+    lineHeight: 1.1,
     theme: getTerminalTheme(resolvedTheme(state.themeMode))
   });
   fitAddon = new window.FitAddon.FitAddon();
   terminal.loadAddon(fitAddon);
+  if (window.WebLinksAddon?.WebLinksAddon) {
+    terminal.loadAddon(new window.WebLinksAddon.WebLinksAddon());
+  }
   terminal.open(els.terminalViewport);
   terminal.writeln("Remote Terminal Mobile ready. Tap Connect.");
   applyFontSize(state.terminalFontSize);
-  fitAddon.fit();
+  queueTerminalFit();
   terminal.onData((data) => {
     sendTerminalInput(data);
   });
-  window.addEventListener("resize", () => {
-    fitAddon?.fit?.();
-    sendResize();
-  });
+  window.addEventListener("resize", queueTerminalFit);
+  if (typeof ResizeObserver === "function") {
+    terminalResizeObserver = new ResizeObserver(() => {
+      queueTerminalFit();
+    });
+    terminalResizeObserver.observe(els.terminalViewport);
+  }
 }
 
 function appendSessionOutput(sessionId, data) {
@@ -492,8 +523,7 @@ function appendSessionOutput(sessionId, data) {
   }
   const previous = terminalSessionBuffers.get(sessionId) || "";
   const next = `${previous}${data}`;
-  const maxChars = 250000;
-  const output = next.length > maxChars ? next.slice(next.length - maxChars) : next;
+  const output = next.length > MAX_SESSION_BUFFER_CHARS ? next.slice(next.length - MAX_SESSION_BUFFER_CHARS) : next;
   terminalSessionBuffers.set(sessionId, output);
   maybeCaptureAuthLink(sessionId, data);
   if (sessionId === state.activeSessionId && !selectableOutputLocked) {
@@ -501,29 +531,69 @@ function appendSessionOutput(sessionId, data) {
   }
 }
 
+function flushQueuedActiveOutput() {
+  if (!terminal || replayInProgress || !queuedActiveOutput.length) {
+    return;
+  }
+  const joined = queuedActiveOutput.join("");
+  queuedActiveOutput = [];
+  if (joined) {
+    terminal.write(joined);
+  }
+}
+
+function writeTerminalData(data) {
+  if (!terminal || !data) {
+    return;
+  }
+  if (replayInProgress) {
+    queuedActiveOutput.push(data);
+    return;
+  }
+  terminal.write(data);
+}
+
 function renderActiveSessionBuffer() {
   if (!terminal) {
     return;
   }
   const activeId = state.activeSessionId;
+  replayInProgress = true;
+  queuedActiveOutput = [];
   terminal.reset();
   if (!activeId) {
     terminal.writeln("No active session. Tap Sessions -> New Session.");
+    replayInProgress = false;
+    flushQueuedActiveOutput();
     return;
   }
   const content = terminalSessionBuffers.get(activeId) || "";
   if (!content) {
     terminal.writeln(`[session ${activeId.slice(0, 8)} ready]`);
     updateSelectableOutput();
+    replayInProgress = false;
+    flushQueuedActiveOutput();
     return;
   }
-  terminal.write(content);
-  updateSelectableOutput();
+  terminal.write(content, () => {
+    replayInProgress = false;
+    updateSelectableOutput();
+    flushQueuedActiveOutput();
+  });
 }
 
 function resetSessionBuffers() {
   terminalSessionBuffers.clear();
+  replayInProgress = false;
+  queuedActiveOutput = [];
   updateSelectableOutput();
+}
+
+function getTerminalDimensions() {
+  return {
+    cols: Math.max(20, Number(terminal?.cols || 80)),
+    rows: Math.max(8, Number(terminal?.rows || 24))
+  };
 }
 
 function clearSheetTransforms() {
@@ -540,6 +610,7 @@ function closeSheets() {
   els.moreSheet.classList.add("hidden");
   els.keysSheet?.classList.add("hidden");
   els.handoffSheet?.classList.add("hidden");
+  applyTerminalChromeMode();
 }
 
 function openSessionsSheet() {
@@ -575,6 +646,8 @@ function openKeysSheet() {
   els.sessionsSheet.classList.add("hidden");
   els.moreSheet.classList.add("hidden");
   els.handoffSheet?.classList.add("hidden");
+  state.terminalChromeVisible = false;
+  applyTerminalChromeMode();
   pushNavState("sheet", "keys");
 }
 
@@ -604,7 +677,7 @@ function connectTerminal() {
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
     if (socket.readyState === WebSocket.OPEN && forceCreateOnConnect) {
       const cwd = connectIntentCwd || getSelectedTerminalCwd();
-      socket.send(JSON.stringify({ type: "create_session", cwd }));
+      socket.send(JSON.stringify({ type: "create_session", cwd, ...getTerminalDimensions() }));
       forceCreateOnConnect = false;
       connectIntentCwd = null;
       setStatus("running", `new session in ${cwd}`);
@@ -617,6 +690,7 @@ function connectTerminal() {
   let initializedFromServer = false;
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   socket = new WebSocket(`${protocol}//${window.location.host}/ws/terminal`);
+  socket.binaryType = "arraybuffer";
   setStatus("idle", "connecting...");
   socket.addEventListener("open", () => {
     clearTimeout(reconnectTimer);
@@ -659,11 +733,12 @@ function connectTerminal() {
     if (payload.type === "output") {
       appendSessionOutput(payload.sessionId, payload.data || "");
       if (payload.sessionId && payload.sessionId === state.activeSessionId) {
-        terminal?.write(payload.data || "");
+        writeTerminalData(payload.data || "");
       }
       return;
     }
     if (payload.type === "session_list") {
+      const previousActiveSessionId = state.activeSessionId;
       state.sessions = payload.sessions || [];
       state.activeSessionId = pickPreferredSessionId(state.sessions, payload.activeSessionId);
       if (!initializedFromServer) {
@@ -676,14 +751,16 @@ function connectTerminal() {
           (forceCreateOnConnect && desiredCwd !== "." && desiredCwd !== activeCwd);
         if (shouldCreateNew && socket?.readyState === WebSocket.OPEN) {
           const cwd = desiredCwd;
-          socket.send(JSON.stringify({ type: "create_session", cwd }));
+          socket.send(JSON.stringify({ type: "create_session", cwd, ...getTerminalDimensions() }));
           forceCreateOnConnect = false;
           connectIntentCwd = null;
         }
       }
       if (state.activeSessionId) {
         rememberLastSession(state.activeSessionId);
-        renderActiveSessionBuffer();
+        if (previousActiveSessionId !== state.activeSessionId && terminalSessionBuffers.has(state.activeSessionId)) {
+          renderActiveSessionBuffer();
+        }
         setStatus("running", `session ${state.activeSessionId.slice(0, 6)}`);
       }
       renderSessions();
@@ -698,12 +775,14 @@ function connectTerminal() {
           terminalSessionBuffers.set(payload.sessionId, "");
         }
         renderActiveSessionBuffer();
+        queueTerminalFit();
         syncSessionLabel();
         setStatus("running", `session ${payload.sessionId.slice(0, 6)}`);
       } else if (payload.status === "switched" && payload.sessionId) {
         state.activeSessionId = payload.sessionId;
         rememberLastSession(payload.sessionId);
         renderActiveSessionBuffer();
+        queueTerminalFit();
         syncSessionLabel();
       } else if (payload.status === "error") {
         setStatus("failed", payload.message || "error");
@@ -714,6 +793,7 @@ function connectTerminal() {
       terminalSessionBuffers.set(payload.sessionId, payload.data || "");
       if (payload.sessionId === state.activeSessionId) {
         renderActiveSessionBuffer();
+        queueTerminalFit();
       }
       return;
     }
@@ -1896,7 +1976,7 @@ function bindEvents() {
   els.newSessionHereButton?.addEventListener("click", () => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     const cwd = getSelectedTerminalCwd();
-    socket.send(JSON.stringify({ type: "create_session", cwd }));
+    socket.send(JSON.stringify({ type: "create_session", cwd, ...getTerminalDimensions() }));
     setStatus("running", `new session in ${cwd}`);
   });
   els.closeActiveSessionButton.addEventListener("click", () => {
